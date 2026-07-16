@@ -1,0 +1,16 @@
+{
+  "name": "portfolio-pipeline",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "sync": "astro sync",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "^7.0.9"
+  }
+}

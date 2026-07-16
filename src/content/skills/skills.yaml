@@ -1,0 +1,56 @@
+﻿programming:
+  order: 1
+  title: 프로그래밍
+  items:
+    - C#
+    - HLSL
+    # 포트폴리오 원본에는 'ShaderLap'으로 적혀 있으나 오타로 보여 바로잡았다.
+    # 같은 문서의 4인 팀프로젝트 기술 스택에는 'ShaderLab'으로 적혀 있다.
+    - ShaderLab
+  highlights:
+    - C# 유니티 6개의 개인, 3개의 팀 프로젝트
+    - 커스텀 Shader 작성, 실루엣·속도선 구현
+
+debugging:
+  order: 2
+  title: 디버깅 · 최적화
+  items:
+    - Unity Profiler
+    - Profile Analyzer
+    - IDE Debugger
+  highlights:
+    - Occlusion Culling으로 GPU 병목 해결
+    - GC 최적화 전후 비교
+
+vcs:
+  order: 3
+  title: 형상 관리
+  items:
+    - Github Desktop
+    - SourceTree
+    - Git Bash (CLI)
+  highlights:
+    - SourceTree · GithubFlow 브랜치 전략 협업
+    - CLI 브랜치 강제 변경, ignore 추적 관리
+
+cicd:
+  order: 4
+  title: CI / CD
+  items:
+    - Jenkins
+    - Github Actions
+  highlights:
+    - 빌드 자동화 구성 경험
+
+unity:
+  order: 5
+  title: Unity 기능 · 써드파티
+  items:
+    - Timeline
+    - Shader Graph
+    - VContainer
+    - Addressables
+    - UniTask
+  highlights:
+    - 커스텀 트랙 구현, 피격 효과 구현, DI 구조 협업
+    - 비동기로 리소스 로딩 및 핸들 해제
