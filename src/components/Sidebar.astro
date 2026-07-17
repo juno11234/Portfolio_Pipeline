@@ -1,0 +1,380 @@
+---
+import { getCollection } from 'astro:content';
+import type { TocItem } from '../layouts/Base.astro';
+
+interface Props {
+  collapsed?: boolean;
+  /** 지금 보고 있는 프로젝트의 키. 그 항목이 활성으로 표시되고 아래에 목차가 펼쳐진다. */
+  activeProject?: string;
+  toc?: TocItem[];
+}
+
+const { collapsed = false, activeProject, toc = [] } = Astro.props;
+
+const all = await getCollection('projects');
+const byOrder = (a: { data: { order: number } }, b: { data: { order: number } }): number =>
+  a.data.order - b.data.order;
+
+const featured = all.filter((p) => p.data.featured === true).sort(byOrder);
+const others = all.filter((p) => p.data.featured === false).sort(byOrder);
+
+/** 장르 뒤에 인원을 붙인다. 1인 프로젝트는 team이 없어 장르만 나온다. */
+function navLabel(genre: string, team: string | undefined): string {
+  if (team === undefined) return genre;
+  return `${genre} · ${team}`;
+}
+
+const num = (n: number): string => String(n).padStart(2, '0');
+---
+
+<aside class:list={['sidebar', { 'is-collapsed': collapsed }]} data-sidebar>
+  <button
+    class="toggle"
+    type="button"
+    data-toggle
+    aria-expanded={collapsed === true ? 'false' : 'true'}
+    aria-controls="sidebar-nav"
+    aria-label={collapsed === true ? '사이드바 펼치기' : '사이드바 접기'}
+  >
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M10 3.5 5.5 8l4.5 4.5" stroke="currentColor" stroke-width="1.9"
+            stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+
+  <nav class="full" id="sidebar-nav" aria-label="사이트">
+    <ul class="menu">
+      <li>
+        <a href="/">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M2 6.5 8 2l6 4.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5Z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+          </svg>
+          홈
+        </a>
+      </li>
+      <li>
+        <a href="/about">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3.5 2h6L13 5.5V14H3.5V2Z" stroke="currentColor" stroke-width="1.5"
+                  stroke-linejoin="round" />
+            <path d="M9 2v4h4M6 9h4M6 11.5h4" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" />
+          </svg>
+          자기소개서
+        </a>
+      </li>
+    </ul>
+
+    {[
+      { label: '대표 프로젝트', items: featured, numbered: true },
+      { label: '그외 프로젝트', items: others, numbered: false },
+    ].map((group) => (
+      <div class="group">
+        <p class="group-label">{group.label}</p>
+        <ul class="projects">
+          {group.items.map((p) => (
+            <li>
+              <a
+                href={`/projects/${p.id}`}
+                class:list={{ 'is-active': p.id === activeProject }}
+                aria-current={p.id === activeProject ? 'page' : undefined}
+              >
+                <span class="pn tnum">{group.numbered === true ? num(p.data.order) : '·'}</span>
+                <span class="ptx">
+                  <span class="pt">{p.data.title}</span>
+                  <span class="pg">{navLabel(p.data.genre, p.data.team)}</span>
+                </span>
+              </a>
+
+              {/* 지금 보는 프로젝트 아래에만 그 문서의 목차를 펼친다 */}
+              {p.id === activeProject && toc.length > 0 && (
+                <ul class="toc">
+                  {toc.map((t, i) => (
+                    <li>
+                      <a href={`#${t.id}`} data-toc={t.id}>
+                        <span class="tn tnum">{num(i + 1)}</span>
+                        <span class="tl">{t.label}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </nav>
+
+  {/* 접혔을 때 */}
+  <div class="rail" aria-hidden={collapsed === true ? 'false' : 'true'} data-rail>
+    <a href="/" class="is-menu" data-name="홈" tabindex="-1">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M2 6.5 8 2l6 4.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+      </svg>
+    </a>
+    <a href="/about" class="is-menu" data-name="자기소개서" tabindex="-1">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3.5 2h6L13 5.5V14H3.5V2Z" stroke="currentColor" stroke-width="1.5"
+              stroke-linejoin="round" />
+        <path d="M9 2v4h4M6 9h4M6 11.5h4" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" />
+      </svg>
+    </a>
+    <span class="rail-sep"></span>
+    {featured.map((p) => (
+      <a
+        href={`/projects/${p.id}`}
+        class:list={['tnum', { 'is-active': p.id === activeProject }]}
+        data-name={p.data.title}
+        tabindex="-1"
+      >{num(p.data.order)}</a>
+    ))}
+    <span class="rail-sep"></span>
+    {others.map((p) => (
+      <a
+        href={`/projects/${p.id}`}
+        class:list={['is-etc', { 'is-active': p.id === activeProject }]}
+        data-name={p.data.title}
+        tabindex="-1"
+      >·</a>
+    ))}
+  </div>
+</aside>
+
+<style>
+  .sidebar {
+    flex: none;
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100dvh;
+    overflow: hidden;
+    transition: width var(--ease);
+  }
+  .sidebar.is-collapsed { width: var(--sidebar-w-collapsed); }
+
+  .toggle {
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    z-index: 3;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink-faint);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    transition: background .16s ease, color .16s ease, right var(--ease);
+  }
+  .toggle:hover { background: var(--surface-hover); color: var(--ink); }
+  .toggle svg { width: 14px; height: 14px; transition: transform var(--ease); }
+  .sidebar.is-collapsed .toggle { right: 16px; }
+  .sidebar.is-collapsed .toggle svg { transform: rotate(180deg); }
+
+  .full {
+    width: var(--sidebar-w);
+    height: 100dvh;
+    overflow-y: auto;
+    padding: 54px 0 30px;
+    transition: opacity .2s ease;
+  }
+  .sidebar.is-collapsed .full { opacity: 0; pointer-events: none; }
+
+  .menu { padding: 0 12px; margin-bottom: 6px; }
+  .menu a {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 13px;
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    transition: background .15s ease;
+  }
+  .menu a svg { width: 14px; height: 14px; flex: none; color: var(--ink-muted); }
+  .menu a:hover { background: var(--surface-hover); color: var(--ink); }
+
+  .group { padding-top: 12px; }
+  .group-label {
+    font: 600 9px var(--mono);
+    letter-spacing: .16em;
+    color: var(--ink-ghost);
+    padding: 0 24px 9px;
+  }
+
+  .projects a {
+    display: flex;
+    gap: 11px;
+    align-items: center;
+    margin: 0 12px 4px;
+    padding: 10px 13px;
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    transition: background .15s ease, box-shadow .15s ease;
+  }
+  .projects a:hover { background: var(--surface-hover); color: var(--ink); }
+  .projects a.is-active {
+    background: var(--accent);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .32);
+  }
+  .projects a.is-active .pn { color: rgba(255, 255, 255, .8); }
+  .projects a.is-active .pt { color: #fff; }
+  .projects a.is-active .pg { color: rgba(255, 255, 255, .72); }
+
+  .pn { font: 700 10px var(--mono); color: var(--accent); flex: none; }
+  .ptx { display: grid; gap: 1px; min-width: 0; }
+  .pt { font-size: 13px; font-weight: 700; line-height: 1.3; }
+  .pg { font-size: 10.5px; color: var(--ink-faint); font-weight: 500; }
+
+  /* 활성 프로젝트 아래에 펼쳐지는 문서 목차 */
+  .toc {
+    margin: 2px 12px 8px 30px;
+    padding-left: 11px;
+    border-left: 1px solid var(--line);
+    display: grid;
+    gap: 1px;
+  }
+  .toc a {
+    display: flex;
+    gap: 9px;
+    align-items: baseline;
+    margin: 0;
+    padding: 6px 9px;
+    border-radius: 7px;
+    color: var(--ink-soft);
+    transition: background .15s ease, color .15s ease;
+  }
+  .toc a:hover { background: var(--surface-hover); color: var(--ink); }
+  /* 스크롤 위치에 따라 스크립트가 붙인다 */
+  .toc a.is-current { color: var(--accent); background: var(--accent-tint); }
+  .tn { font: 600 9px var(--mono); color: var(--ink-ghost); flex: none; }
+  .toc a.is-current .tn { color: var(--accent); }
+  .tl { font-size: 12px; font-weight: 600; }
+
+  /* 접힌 상태 — 아이콘 레일 */
+  .rail {
+    position: absolute;
+    inset: 0;
+    padding: 54px 0 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease .06s;
+  }
+  .sidebar.is-collapsed .rail { opacity: 1; pointer-events: auto; }
+
+  .rail a {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: 700 11px var(--mono);
+    color: var(--accent);
+    transition: background .16s ease, color .16s ease;
+  }
+  .rail a svg { width: 14px; height: 14px; }
+  .rail a.is-menu { color: var(--ink-muted); }
+  .rail a.is-etc { color: var(--ink-ghost); font-size: 15px; }
+  .rail a:hover { background: var(--surface-hover); }
+  .rail a.is-active { background: var(--accent); color: #fff; }
+  .rail a::after {
+    content: attr(data-name);
+    position: absolute;
+    left: calc(100% + 9px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--dark-deep);
+    color: #fff;
+    padding: 5px 9px;
+    border-radius: 6px;
+    font: 700 11px var(--font);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .14s ease;
+    z-index: 5;
+  }
+  .rail a:hover::after,
+  .rail a:focus-visible::after { opacity: 1; }
+  .rail-sep { width: 18px; height: 1px; background: var(--line); margin: 7px 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar, .full, .rail, .toggle, .toggle svg,
+    .menu a, .projects a, .toc a, .rail a, .rail a::after { transition: none; }
+  }
+
+  /* 세로로 쌓이면 따라올 자리가 없다. 고정과 접힘을 모두 푼다. */
+  @media (max-width: 860px) {
+    .sidebar, .sidebar.is-collapsed {
+      width: 100%;
+      position: static;
+      height: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .full { width: 100%; height: auto; padding-top: 22px; opacity: 1; pointer-events: auto; }
+    .rail, .toggle { display: none; }
+  }
+</style>
+
+<script>
+  const sidebar = document.querySelector<HTMLElement>('[data-sidebar]');
+  const toggle = document.querySelector<HTMLButtonElement>('[data-toggle]');
+  const rail = document.querySelector<HTMLElement>('[data-rail]');
+
+  if (sidebar !== null && toggle !== null && rail !== null) {
+    const railLinks = rail.querySelectorAll<HTMLAnchorElement>('a');
+    const fullLinks = sidebar.querySelectorAll<HTMLAnchorElement>('.full a');
+
+    toggle.addEventListener('click', () => {
+      const collapsed = sidebar.classList.toggle('is-collapsed');
+
+      toggle.setAttribute('aria-expanded', String(collapsed === false));
+      toggle.setAttribute('aria-label', collapsed === true ? '사이드바 펼치기' : '사이드바 접기');
+      rail.setAttribute('aria-hidden', String(collapsed === false));
+
+      // 화면에서 사라진 쪽은 키보드 탭 순서에서도 빠져야 한다.
+      railLinks.forEach((a) => { a.tabIndex = collapsed === true ? 0 : -1; });
+      fullLinks.forEach((a) => { a.tabIndex = collapsed === true ? -1 : 0; });
+    });
+  }
+
+  // 스크롤 위치에 맞춰 목차에서 현재 섹션을 표시한다.
+  const tocLinks = document.querySelectorAll<HTMLAnchorElement>('[data-toc]');
+  const sections = document.querySelectorAll<HTMLElement>('[data-section]');
+
+  if (tocLinks.length > 0 && sections.length > 0) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting === false) continue;
+          tocLinks.forEach((a) => {
+            a.classList.toggle('is-current', a.dataset.toc === entry.target.id);
+          });
+        }
+      },
+      // 화면 상단 1/3 을 지나는 섹션을 현재로 본다.
+      { rootMargin: '-10% 0px -70% 0px' },
+    );
+    sections.forEach((s) => observer.observe(s));
+  }
+</script>

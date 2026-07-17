@@ -1,0 +1,84 @@
+---
+import Sidebar from '../components/Sidebar.astro';
+import '../styles/global.css';
+
+/** 사이드바 하단에 펼칠 문서 목차 한 줄 */
+export interface TocItem {
+  id: string;
+  label: string;
+}
+
+interface Props {
+  title: string;
+  description: string;
+  /** 사이드바를 접은 채로 시작할지 */
+  sidebarCollapsed?: boolean;
+  /**
+   * 현재 페이지가 프로젝트 상세일 때, 사이드바에서 그 프로젝트를 현재 위치로 표시한다.
+   * projects.yaml 의 키.
+   */
+  activeProject?: string;
+  /** 현재 문서의 목차. 활성 프로젝트 아래에 펼쳐진다. */
+  toc?: TocItem[];
+}
+
+const {
+  title,
+  description,
+  sidebarCollapsed = false,
+  activeProject,
+  toc = [],
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    {/* 본문 Pretendard, 코드·라벨 JetBrains Mono — 가이드가 권하는 2폰트 구성 */}
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    />
+  </head>
+  <body>
+    <div class="shell">
+      <Sidebar collapsed={sidebarCollapsed} activeProject={activeProject} toc={toc} />
+      <main class="main">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>
+
+<style>
+  /*
+   * 사이드바가 자기 width로 폭을 정하고(Sidebar.astro의 flex: none),
+   * 본문이 남은 자리를 채운다. 접힘 상태를 이 컴포넌트가 알 필요가 없다.
+   */
+  .shell {
+    display: flex;
+    min-height: 100dvh;
+  }
+  .main {
+    flex: 1;
+    min-width: 0;
+    padding: 60px 54px 96px;
+  }
+
+  @media (max-width: 860px) {
+    .shell { flex-direction: column; }
+    .main { padding: 30px 20px 48px; }
+  }
+</style>

@@ -1,0 +1,113 @@
+/*
+ * 디자인 토큰 — claude.ai/design 의 "VamSirLike Document" 에서 추출했다.
+ *
+ * 이전 토큰은 포트폴리오 PDF의 블루 그라데이션 톤이었으나 사용자가 이 미니멀 테마를 골랐다.
+ * 가이드 Part 3의 권장과도 맞는다 — "미니멀(권장): 대부분의 기술 문서",
+ * "폰트는 본문·코드 2종, 색은 배경·텍스트·강조 3색으로 제한".
+ *
+ * 색을 바꾸려면 여기만 고친다.
+ */
+:root {
+  /* 3색 — 배경 · 텍스트 · 강조 */
+  --bg: #f7f7f5;
+  --ink: #17181a;
+  --accent: #2563eb;
+
+  /* 강조 파생 */
+  --accent-strong: #1d4ed8;
+  --accent-tint: #eef3ff;
+  --accent-line: #cddcfb;
+
+  /* 잉크 파생 — 위계용 */
+  --ink-mid: #44454a;
+  --ink-soft: #55565a;
+  --ink-faint: #8a8b90;
+  --ink-muted: #a0a1a6;
+  --ink-ghost: #c2c3c8;
+
+  /* 면 */
+  --surface: #ffffff;
+  --surface-2: #f4f5f7;
+  --surface-hover: #f1f1ef;
+  --line: rgba(20, 22, 26, .09);
+
+  /* 어두운 면 — 코드 블록, 인터페이스 박스 */
+  --dark: #26272b;
+  --dark-deep: #17181a;
+  --dark-ink: #e6e7ea;
+
+  /* 개선 수치 */
+  --good: #1a8a5a;
+  --warn: #b4553f;
+
+  --radius: 13px;
+  --radius-sm: 9px;
+  --ease: .3s cubic-bezier(.4, 0, .2, 1);
+
+  --sidebar-w: 250px;
+  --sidebar-w-collapsed: 60px;
+
+  /* 문서 본문 단 — 디자인 원본의 max-width 860px */
+  --page-max: 860px;
+
+  /* 2폰트 — 본문 Pretendard, 코드·라벨 JetBrains Mono */
+  --font: 'Pretendard Variable', Pretendard, system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, p, ul, ol, figure, dl, dd, pre { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+img { max-width: 100%; display: block; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-strong); }
+::selection { background: var(--accent-line); }
+pre { tab-size: 2; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 숫자가 세로로 줄 맞아야 하는 곳 */
+.tnum { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+/*
+ * 문장 안 강조 — src/lib/rich.ts 가 콘텐츠의 마크업을 이 태그들로 바꾼다.
+ *
+ * 두 디자인 모두 볼드를 잉크 원색으로 올려 본문(회색)과 위계를 만든다.
+ * 강조가 없으면 읽는 사람이 무엇이 중요한지 스스로 찾아야 한다.
+ */
+b {
+  font-weight: 700;
+  color: var(--ink);
+}
+code {
+  font-family: var(--mono);
+  font-size: .92em;
+  color: var(--accent-strong);
+  background: var(--accent-tint);
+  border: 1px solid var(--accent-line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+/* 어두운 면 위에서는 반대로 */
+.code pre code, pre code {
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}

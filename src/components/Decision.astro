@@ -1,0 +1,143 @@
+---
+/**
+ * 의사결정 하나 — 기준별 비교표 + 결정 근거.
+ *
+ * 이 문서에서 가장 값어치 있는 블록이다. 무엇을 만들었는지는 누구나 적지만
+ * 왜 그 방식을 골랐는지는 대부분 못 적는다.
+ * 원본 PDF에서는 이 내용이 72ppi 이미지에 묻혀 검색도 복사도 안 됐다.
+ *
+ * 형태는 claude.ai/design 의 "VamSirLike Document" 04 고민과 선택을 따른다.
+ * 행이 기준, 열이 선택지이고 고른 열만 강조된다.
+ */
+import type { CollectionEntry } from 'astro:content';
+import { rich } from '../lib/rich';
+
+type Doc = CollectionEntry<'projectDocs'>['data'];
+
+interface Props {
+  decision: Doc['decisions'][number];
+}
+
+const { decision } = Astro.props;
+const chosen = decision.options.find((o) => o.chosen === true);
+---
+
+<div class="decision">
+  <h3 class="dtitle">{decision.title}</h3>
+
+  <div class="scroll">
+    <table class="dtbl">
+      <thead>
+        <tr>
+          <th></th>
+          {decision.options.map((o) => (
+            <th class:list={{ 'is-chosen': o.chosen === true }}>
+              <span class="okey">{o.key}</span>
+              <span class="oname">{o.title}</span>
+              {o.chosen === true && <span class="badge">선택</span>}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {decision.criteria.map((c) => (
+          <tr>
+            <th scope="row">{c.label}</th>
+            {c.values.map((v, i) => (
+              <td class:list={{ 'is-chosen': decision.options[i]?.chosen === true }} set:html={rich(v)} />
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="reason">
+    <span class="rlabel">결정 → {chosen?.key}</span>
+    <span set:html={rich(decision.reason)} />
+  </p>
+</div>
+
+<style>
+  .decision { display: grid; gap: 12px; }
+  .dtitle { font-size: 16px; font-weight: 700; letter-spacing: -.015em; }
+
+  /* 좁은 화면에서 표만 옆으로 밀리게 한다. 페이지 전체가 밀리면 안 된다. */
+  .scroll { overflow-x: auto; }
+
+  .dtbl { border-collapse: collapse; width: 100%; }
+  .dtbl thead th {
+    text-align: left;
+    padding: 12px 14px;
+    vertical-align: top;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom: 0;
+  }
+  .dtbl thead th:first-child { background: transparent; border: 0; width: 132px; }
+  .dtbl thead th.is-chosen { background: var(--accent-tint); border-color: var(--accent-line); }
+  .okey { font: 700 10px var(--mono); color: var(--ink-ghost); margin-right: 7px; }
+  .oname { font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; }
+  .dtbl thead th.is-chosen .okey,
+  .dtbl thead th.is-chosen .oname { color: var(--accent); }
+  .badge {
+    display: inline-block;
+    margin-left: 7px;
+    background: var(--accent);
+    color: #fff;
+    font: 700 9px var(--mono);
+    letter-spacing: .06em;
+    padding: 3px 7px;
+    border-radius: 999px;
+    vertical-align: 1px;
+  }
+
+  .dtbl tbody th {
+    text-align: left;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink);
+    padding: 12px 14px 12px 0;
+    border-top: 1px solid var(--line);
+    vertical-align: top;
+    white-space: nowrap;
+  }
+  .dtbl tbody td {
+    font-size: 12.5px;
+    line-height: 1.62;
+    color: var(--ink-soft);
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    vertical-align: top;
+  }
+  .dtbl tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  .dtbl tbody td.is-chosen {
+    background: var(--accent-tint);
+    border-color: var(--accent-line);
+    color: var(--ink-mid);
+  }
+
+  .reason {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 11px 11px 0;
+    padding: 13px 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+  }
+  .rlabel {
+    display: inline-block;
+    font: 700 9.5px var(--mono);
+    letter-spacing: .1em;
+    color: #fff;
+    background: var(--accent);
+    border-radius: 5px;
+    padding: 3px 8px;
+    margin-right: 10px;
+    vertical-align: 1px;
+  }
+</style>

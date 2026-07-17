@@ -1,0 +1,210 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import { Image } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+
+const profile = await getEntry('profile', 'profile');
+if (profile === undefined) {
+  throw new Error('src/content/profile/profile.yaml 을 찾을 수 없습니다.');
+}
+const me = profile.data;
+
+const skills = (await getCollection('skills')).sort((a, b) => a.data.order - b.data.order);
+
+/** 시작·종료가 모두 있으면 범위로, 자격증처럼 하나뿐이면 그대로 보여준다. */
+function period(startDate: string, endDate: string | undefined): string {
+  if (endDate === undefined) return startDate;
+  return `${startDate} — ${endDate}`;
+}
+
+/** 이력 세 종류를 화면에 나올 순서대로 한 배열에 모은다. */
+const history = [
+  { label: '학력', entries: me.education },
+  { label: '교육', entries: me.training },
+  { label: '자격', entries: me.certificates },
+];
+---
+
+<Base title={`${me.name} — ${me.role}`} description={me.tagline}>
+  <div class="page">
+  <header class="hero">
+    <div class="id">
+      <Image class="photo" src={me.photo} alt={`${me.name} 프로필 사진`} width={188} height={242} />
+      <div>
+        <p class="role">{me.role}</p>
+        <h1 class="name">{me.name}</h1>
+        <p class="tagline">{me.tagline}</p>
+      </div>
+    </div>
+    <div class="chips tnum">
+      <a href={`mailto:${me.email}`}>{me.email}</a>
+      <span>{me.phone}</span>
+      <span>{me.location} · {me.career}</span>
+    </div>
+  </header>
+
+  <h2 class="h2">이력</h2>
+  <div class="rows">
+    {history.map((group) => group.entries.map((entry) => (
+      <div class="row is-hist">
+        <div class="row-l"><h3>{group.label}</h3></div>
+        <div>
+          <p class="hist-t">{entry.name}</p>
+          {entry.organization !== undefined && <p class="hist-o">{entry.organization}</p>}
+        </div>
+        <p class="hist-d tnum">{period(entry.startDate, entry.endDate)}</p>
+      </div>
+    )))}
+  </div>
+
+  <h2 class="h2">기술스택</h2>
+  <div class="rows">
+    {skills.map((skill) => (
+      <div class="row">
+        <div class="row-l">
+          <span class="num tnum">{String(skill.data.order).padStart(2, '0')}</span>
+          <h3>{skill.data.title}</h3>
+        </div>
+        <div class="row-r">
+          <div class="tags">
+            {skill.data.items.map((item) => <span class="pill">{item}</span>)}
+          </div>
+          <ul class="hl">
+            {skill.data.highlights.map((line) => <li>{line}</li>)}
+          </ul>
+        </div>
+      </div>
+    ))}
+  </div>
+  </div>
+</Base>
+
+<style>
+  /*
+   * 폭 상한. 이게 없으면 사이드바를 접었을 때 행만 넓어지고 오른쪽이 빈다.
+   * 읽는 글인 자기소개서보다 넓은 값을 쓴다. 좁히면 기술 태그가 두 줄로 접히고
+   * 히어로의 연락처 칩이 아래로 밀려서 원본 표지의 배치가 깨진다.
+   */
+  .page { max-width: var(--page-max); margin-inline: auto; }
+
+  /* 히어로 — 연락처 알약은 원본 PDF 표지의 형태를 그대로 가져왔다 */
+  .hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 38px;
+  }
+  .id { display: flex; align-items: center; gap: 20px; }
+  .photo {
+    width: 94px;
+    height: 121px;
+    flex: none;
+    border-radius: 12px;
+    object-fit: cover;
+    object-position: center top;
+    background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  .role {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: .02em;
+    margin-bottom: 7px;
+  }
+  .name { font-size: 52px; font-weight: 800; letter-spacing: -.035em; line-height: 1.02; }
+  .tagline {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-top: 11px;
+    max-width: 42ch;
+  }
+
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chips > * {
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 7px 15px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .chips a { transition: color .16s ease; }
+  .chips a:hover { color: var(--accent); }
+
+  .h2 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 18px; }
+  .rows { display: grid; gap: 11px; }
+  .rows + .h2 { margin-top: 36px; }
+
+  .row {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    padding: 16px 18px;
+    display: grid;
+    grid-template-columns: 148px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .row-l { display: flex; align-items: baseline; gap: 7px; }
+  .row-l h3 { font-size: 15.5px; font-weight: 800; letter-spacing: -.01em; }
+  .row-r { display: grid; gap: 10px; }
+  .num { color: var(--accent); font-weight: 800; font-size: 13px; letter-spacing: -.02em; }
+
+  /* 이력 행 — 기술스택과 같은 148px 라벨 폭을 공유해 두 섹션의 세로선이 맞는다 */
+  .row.is-hist { grid-template-columns: 148px 1fr auto; align-items: center; }
+  .hist-t { font-size: 14.5px; font-weight: 800; letter-spacing: -.01em; }
+  .hist-o { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; margin-top: 1px; }
+  .hist-d {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill {
+    display: inline-block;
+    background: var(--accent-tint);
+    border: 1px solid var(--accent-line);
+    color: var(--accent-strong);
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 4px 11px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .hl { display: grid; gap: 3px; }
+  .hl li {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-weight: 600;
+    padding-left: 11px;
+    position: relative;
+  }
+  .hl li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .58em;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: .55;
+  }
+
+  @media (max-width: 860px) {
+    .name { font-size: 38px; }
+    .id { gap: 14px; }
+    .photo { width: 74px; height: 95px; }
+    .row, .row.is-hist { grid-template-columns: 1fr; gap: 10px; }
+    .hist-d { margin-top: 2px; }
+  }
+</style>

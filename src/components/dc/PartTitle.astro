@@ -1,0 +1,28 @@
+---
+/**
+ * 꼭지 제목 — 파란 배지 + 제목.
+ *
+ * 디자인에서 가장 많이 반복되는 패턴이다(뱀서라이크 20회 · Bond 23회).
+ * 배지가 '무엇에 대한 이야기인지'(기술 스택 · 핵심 동작 · 데이터 · CI)를 먼저 알려주고
+ * 제목이 그 안에서 무슨 판단을 했는지 말한다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `<h3 style="display:flex;align-items:center;gap:10px;...">`
+ */
+interface Props {
+  /** 배지에 들어갈 말. 짧게. 예: 기술 스택 · 핵심 동작 · EDITOR TOOL */
+  badge: string;
+  title: string;
+}
+
+const { badge, title } = Astro.props;
+---
+
+{/*
+  원본은 배지와 제목 사이에 공백 문자가 있다. h3 가 flex 라 gap:10px 이 이미 있지만,
+  공백까지 있어야 원본과 같은 간격이 된다. Astro 는 태그 사이 개행을 지우므로
+  {' '} 로 명시해야 한다. 없으면 배지와 제목이 딱 붙는다.
+*/}
+<h3 style="display:flex;align-items:center;gap:10px;margin:0 0 4px;font-size:17px;font-weight:800;color:#17181a"><span
+    style="font:700 10px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:5px;padding:3px 8px"
+  >{badge}</span>{' '}{title}{' '}</h3>

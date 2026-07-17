@@ -1,0 +1,37 @@
+---
+/**
+ * 섹션 헤더 — 큰 번호 + 파란 밑줄 + SECTION NN + 제목.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** 다시 그리지 않았다.
+ * 값이 들어갈 자리(번호·제목)만 뚫었고 style 문자열은 원본과 한 글자도 다르지 않다.
+ *
+ * 이게 이 폴더(components/dc/)의 규칙이다. 디자인을 보고 "비슷하게" 만들면
+ * 매번 조금씩 깎여서 결국 원본만 못해진다. 마크업을 떠 오면 그럴 일이 없다.
+ *
+ * 원본 대조: design.html 의 `<section data-section id="sec-1" ...>` 첫 덩어리.
+ */
+interface Props {
+  /** 화면에 찍히는 번호. '01' 처럼 두 자리로 넘긴다. */
+  num: string;
+  title: string;
+  /** 앵커 id — 사이드바 목차가 이 값으로 건다 */
+  id: string;
+}
+
+const { num, title, id } = Astro.props;
+---
+
+<section data-section id={id} style="scroll-margin-top:24px">
+  <div style="display:flex;align-items:flex-end;gap:16px;margin:0 0 22px">
+    <div
+      style="font-size:62px;font-weight:800;line-height:.78;color:#17181a;letter-spacing:-.045em;border-bottom:5px solid #2563eb;padding-bottom:5px"
+    >{num}</div>
+    <div style="padding-bottom:6px">
+      <div
+        style="font:600 11px 'JetBrains Mono',monospace;letter-spacing:.16em;color:#2563eb;margin-bottom:6px"
+      >SECTION {num}</div>
+      <h2 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-.025em;color:#17181a">{title}</h2>
+    </div>
+  </div>
+  <slot />
+</section>

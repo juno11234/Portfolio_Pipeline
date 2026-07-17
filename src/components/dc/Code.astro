@@ -1,0 +1,81 @@
+---
+/**
+ * 코드 블록 — 파일명 머리 + 구문 강조된 코드.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `<pre style="margin:0;padding:15px 17px;...">` 덩어리.
+ *
+ * 원본은 구문 강조를 손으로 span 을 박아 해뒀다. 그대로 두면 프로젝트마다 사람이
+ * span 을 찍어야 하므로 여기서 규칙으로 바꿨다. 두 문서를 훑어보니 색이 셋뿐이라
+ * 규칙이 단순하다 — 키워드 · 리터럴 · 주석.
+ *
+ * 가이드 ③: "1000줄 다 보여주면 최악. '아하!'가 오는 핵심 50줄만 선별."
+ */
+interface Props {
+  /** 머리에 찍히는 출처. 예: CombatSystem.cs · Tick() */
+  source: string;
+  /** 코드 원문. 이스케이프는 이 컴포넌트가 한다. */
+  code: string;
+}
+
+const { source, code } = Astro.props;
+
+/* 원본이 쓰는 세 가지 색. 이 밖의 색은 쓰지 않는다. */
+const KEYWORD = '#2563eb';
+const LITERAL = '#1d4ed8';
+const COMMENT = '#8a8b90';
+
+const KEYWORDS = [
+  'public', 'private', 'protected', 'internal', 'static', 'virtual', 'override', 'abstract',
+  'class', 'struct', 'interface', 'enum', 'void', 'return', 'if', 'else', 'while', 'for',
+  'foreach', 'in', 'switch', 'case', 'break', 'continue', 'new', 'var', 'async', 'await',
+  'int', 'float', 'bool', 'string', 'double',
+];
+
+/** set:html 로 넣을 것이므로 먼저 막는다. 순서가 반대면 코드로 태그를 주입할 수 있다. */
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * 원본의 색칠 규칙을 그대로 적용한다.
+ * 주석을 먼저 떼어내야 주석 안의 'if' 같은 낱말이 키워드로 칠해지지 않는다.
+ */
+function highlight(src: string): string {
+  return escapeHtml(src)
+    .split('\n')
+    .map((line) => {
+      const at = line.indexOf('//');
+      const codePart = at < 0 ? line : line.slice(0, at);
+      const commentPart = at < 0 ? '' : line.slice(at);
+
+      let painted = codePart
+        .replace(
+          new RegExp(`\\b(${KEYWORDS.join('|')})\\b`, 'g'),
+          `<span style="color:${KEYWORD}">$1</span>`,
+        )
+        .replace(/\b(null|true|false)\b/g, `<span style="color:${LITERAL}">$1</span>`);
+
+      if (commentPart !== '') {
+        painted += `<span style="color:${COMMENT}">${commentPart}</span>`;
+      }
+      return painted;
+    })
+    .join('\n');
+}
+
+const painted = highlight(code);
+---
+
+<div
+  style="margin:16px 0;border:1px solid rgba(20,22,26,.12);border-radius:11px;overflow:hidden;background:#fbfbfc"
+>
+  <div
+    style="display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(20,22,26,.07);background:#f4f5f7"
+  ><span style="width:8px;height:8px;border-radius:2px;background:#2563eb"></span><span
+      style="font:600 10.5px 'JetBrains Mono',monospace;color:#55565a"
+    >{source}</span></div>
+  <pre
+    style="margin:0;padding:15px 17px;overflow-x:auto;font:500 12px/1.7 'JetBrains Mono',monospace;color:#1f2024"
+  ><code set:html={painted} /></pre>
+</div>

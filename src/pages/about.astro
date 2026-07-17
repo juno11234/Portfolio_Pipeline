@@ -1,0 +1,210 @@
+---
+import { getEntry } from 'astro:content';
+import Base from '../layouts/Base.astro';
+
+const entry = await getEntry('about', 'about');
+if (entry === undefined) {
+  throw new Error('src/content/about/about.yaml 을 찾을 수 없습니다.');
+}
+const doc = entry.data;
+
+const profile = await getEntry('profile', 'profile');
+if (profile === undefined) {
+  throw new Error('src/content/profile/profile.yaml 을 찾을 수 없습니다.');
+}
+const me = profile.data;
+
+/**
+ * 화면에 나올 순서. 번호(01~04)는 이 배열의 위치에서 나온다.
+ * 원본 자기소개서의 목차 순서와 같다.
+ */
+const sections = [doc.growth, doc.personality, doc.teamwork, doc.goals];
+const numberOf = (section: (typeof sections)[number]): string =>
+  String(sections.indexOf(section) + 1).padStart(2, '0');
+---
+
+<Base title={`자기소개서 — ${me.name}`} description="이주노 자기소개서 — 성장 과정, 성격의 장단점, 팀프로젝트 경험, 목표">
+  <div class="page">
+  <header class="head">
+    <p class="eyebrow">자기소개서</p>
+    <h1 class="title">{me.name}</h1>
+  </header>
+
+  <div class="stack">
+    <!-- 01 성장 과정 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num tnum">{numberOf(doc.growth)}</span>
+        <h2>{doc.growth.title}</h2>
+      </div>
+      <div class="prose">
+        {doc.growth.paragraphs.map((p) => <p>{p}</p>)}
+      </div>
+    </section>
+
+    <!-- 02 성격의 장단점 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num tnum">{numberOf(doc.personality)}</span>
+        <h2>{doc.personality.title}</h2>
+      </div>
+      <div class="cols">
+        {[doc.personality.strength, doc.personality.weakness].map((side) => (
+          <div class="col">
+            <h3 class="label">{side.label}</h3>
+            <div class="prose">
+              {side.paragraphs.map((p) => <p>{p}</p>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- 03 팀프로젝트 경험 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num tnum">{numberOf(doc.teamwork)}</span>
+        <h2>{doc.teamwork.title}</h2>
+      </div>
+      <div class="episodes">
+        {doc.teamwork.episodes.map((ep) => (
+          <article class="episode">
+            <h3 class="sub">{ep.heading}</h3>
+            <div class="prose">
+              {ep.paragraphs.map((p) => <p>{p}</p>)}
+            </div>
+            <div class="callout">
+              <h4>{ep.improvement.title}</h4>
+              {ep.improvement.paragraphs.map((p) => <p>{p}</p>)}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+
+    <!-- 04 목표 -->
+    <section class="card">
+      <div class="card-head">
+        <span class="num tnum">{numberOf(doc.goals)}</span>
+        <h2>{doc.goals.title}</h2>
+      </div>
+      <div class="cols">
+        <div class="goal is-short">
+          <h3>{doc.goals.short.heading}</h3>
+          <div class="prose">
+            {doc.goals.short.paragraphs.map((p) => <p>{p}</p>)}
+          </div>
+        </div>
+        <div class="goal is-long">
+          <h3>{doc.goals.long.heading}</h3>
+          <div class="prose">
+            {doc.goals.long.paragraphs.map((p) => <p>{p}</p>)}
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  </div>
+</Base>
+
+<style>
+  /*
+   * 읽는 글은 한 칼럼으로 둔다.
+   *
+   * 원본 자기소개서가 장단점·목표를 두 칼럼으로 놓은 건 16:9 슬라이드가 가로로 넓고
+   * 세로로 짧아서 가로를 안 쓰면 낭비이기 때문이다. 웹은 세로로 스크롤되므로 그 제약이 없다.
+   * 폭을 여기서 묶어두면 사이드바를 접어도 글 폭이 그대로라 카드 안에 빈자리가 생기지 않는다.
+   * 넓어진 만큼은 배경이 가져간다.
+   */
+  .page { max-width: var(--page-max); margin-inline: auto; }
+
+  .head { margin-bottom: 30px; }
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: .02em;
+    margin-bottom: 7px;
+  }
+  .title { font-size: 44px; font-weight: 800; letter-spacing: -.035em; line-height: 1.02; }
+
+  .stack { display: grid; gap: 14px; }
+
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    padding: 26px 28px 28px;
+  }
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e4e8ee;
+  }
+  .card-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+  .num { font-size: 24px; font-weight: 800; color: var(--accent); letter-spacing: -.03em; }
+
+  /*
+   * 폭은 .page가 이미 잡았으므로 여기서 다시 묶지 않는다.
+   * ch 단위는 숫자 '0' 폭 기준이라 한글에 쓰면 실제보다 절반으로 좁아진다.
+   * 지금 한 줄은 한글 45자 남짓으로 읽기 좋은 범위다.
+   */
+  .prose { display: grid; gap: 13px; }
+  .prose p {
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--ink-soft);
+  }
+
+  .cols { display: grid; gap: 24px; }
+  .col { display: grid; gap: 12px; align-content: start; }
+  .label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+  }
+  .sub { font-size: 16px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 10px; }
+
+  .episodes { display: grid; gap: 26px; }
+  .episode { display: grid; }
+
+  /* 원본의 남색 박스. 사이드바와 같은 어두운 색으로 맞춰 한 사이트로 읽히게 한다. */
+  .callout {
+    background: var(--dark);
+    border-radius: 10px;
+    padding: 15px 17px 16px;
+    margin-top: 15px;
+    display: grid;
+    gap: 7px;
+  }
+  .callout h4 {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -.01em;
+    margin-bottom: 2px;
+  }
+  .callout p {
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: var(--dark-ink);
+  }
+
+  .goal { border-radius: 10px; padding: 18px 20px 20px; }
+  .goal h3 { font-size: 15px; font-weight: 800; letter-spacing: -.01em; margin-bottom: 10px; }
+  /* 원본이 단기는 연한 카드, 장기는 어두운 카드로 대비를 준다. 그 대비를 유지한다. */
+  .goal.is-short { background: #eef2f7; }
+  .goal.is-long { background: var(--dark); }
+  .goal.is-long h3 { color: #fff; }
+  .goal.is-long :global(.prose p) { color: var(--dark-ink); }
+
+  @media (max-width: 860px) {
+    .title { font-size: 34px; }
+    .card { padding: 22px 20px 24px; }
+  }
+</style>

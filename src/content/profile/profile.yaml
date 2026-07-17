@@ -1,4 +1,5 @@
 name: 이주노
+photo: ../../assets/profile.jpg
 role: 게임 클라이언트 개발자
 
 # 자기소개서 '성격의 장단점'에서 가져온 문장이다. 확인 후 교체해도 된다.
@@ -12,8 +13,8 @@ location: 서울
 career: 신입
 
 education:
+  # 학교명이 곧 항목명이라 organization을 적지 않는다. 적으면 화면에 두 번 나온다.
   - name: 염광고등학교 졸업
-    organization: 염광고등학교
     startDate: '2016'
     endDate: '2019'
 

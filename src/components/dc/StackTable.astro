@@ -1,0 +1,45 @@
+---
+/**
+ * 기술 스택 표 — 분류 · 기술 · 사용 목적.
+ *
+ * 두 디자인(뱀서라이크·Bond)이 완전히 같은 모양으로 쓰는 표다.
+ * 세 열의 성격이 달라 각각 다른 style 을 갖는다.
+ *   분류 — 진한 잉크 + 굵게 (무엇에 대한 항목인지)
+ *   기술 — 모노 파랑 (코드에 나오는 이름이라 모노)
+ *   목적 — 회색 (읽는 글)
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 첫 `<table style="width:100%;border-collapse:collapse;...">`
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  rows: Array<{ category: string; tech: string; purpose: string }>;
+}
+
+const { rows } = Astro.props;
+
+/* 원본이 셀마다 반복하는 style. 한 곳에 두고 돌린다. */
+const TH =
+  "text-align:left;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#8a8b90;text-transform:uppercase;padding:10px 12px;border-bottom:1.5px solid rgba(20,22,26,.16)";
+const TD_BASE = 'padding:11px 12px;border-bottom:1px solid rgba(20,22,26,.07)';
+---
+
+<table style="width:100%;border-collapse:collapse;margin:16px 0 8px;font-size:13px">
+  <thead>
+    <tr>
+      <th style={`${TH};width:118px`}>분류</th>
+      <th style={`${TH};width:180px`}>기술</th>
+      <th style={TH}>사용 목적</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows.map((row) => (
+      <tr>
+        <td style={`${TD_BASE};color:#17181a;font-weight:600`}>{row.category}</td>
+        <td style={`${TD_BASE};font-family:'JetBrains Mono',monospace;font-size:12px;color:#1d4ed8`}>{row.tech}</td>
+        <td style={`${TD_BASE};color:#44454a`} set:html={rich(row.purpose)} />
+      </tr>
+    ))}
+  </tbody>
+</table>
