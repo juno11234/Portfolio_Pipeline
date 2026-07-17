@@ -95,19 +95,17 @@ b {
   font-weight: 700;
   color: var(--ink);
 }
+/*
+ * 문장 안 코드 — 두 디자인이 55군데에서 쓰는 모양 그대로다.
+ * 원본은 모노 + 파란 글씨뿐이고 배경도 테두리도 없다.
+ * 처음엔 배경과 테두리를 덧붙였는데, 그러면 55군데가 원본보다 요란해진다.
+ * 원본 대조: <code style="font-family:'JetBrains Mono',monospace;color:#1d4ed8">
+ */
 code {
-  font-family: var(--mono);
-  font-size: .92em;
-  color: var(--accent-strong);
-  background: var(--accent-tint);
-  border: 1px solid var(--accent-line);
-  border-radius: 4px;
-  padding: 1px 5px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #1d4ed8;
 }
-/* 어두운 면 위에서는 반대로 */
-.code pre code, pre code {
+/* 코드 블록 안에서는 색을 물려받는다. 구문 강조가 span 으로 따로 칠하기 때문. */
+pre code {
   color: inherit;
-  background: none;
-  border: 0;
-  padding: 0;
 }
