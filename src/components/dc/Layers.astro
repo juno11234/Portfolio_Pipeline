@@ -1,0 +1,69 @@
+---
+/**
+ * 계층도 — 계층 상자를 쌓고 사이에 아래 방향 삼각형을 둔다.
+ *
+ * 뱀서라이크 '시스템 구조'(3계층)와 Bond 'DI 스코프 계층'(4계층)이 같은 모양이다.
+ * 서로 다른 프로젝트에서 같은 그림이 나온 것 — 컴포넌트로 뽑을 근거다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `조립 계층 · COMPOSITION` 덩어리.
+ *
+ * 원본은 첫 계층만 파란 헤더 + 파란 그림자로 강조하고 나머지는 연한 헤더를 쓴다.
+ * 조립 루트가 다른 계층을 만드는 쪽이라 위계가 있기 때문이다. 그 규칙을 그대로 뒀다.
+ */
+interface Layer {
+  /** 예: 조립 계층 · COMPOSITION */
+  name: string;
+  /** 헤더 오른쪽 한 줄. 이 계층이 무엇을 하는지. */
+  note: string;
+  /** 상자 안에 늘어놓을 클래스 이름들 */
+  items: string[];
+}
+
+interface Props {
+  layers: Layer[];
+}
+
+const { layers } = Astro.props;
+
+/* 원본이 노드마다 반복하는 style */
+const NODE =
+  "font:600 11px 'JetBrains Mono',monospace;color:#26272b;background:#fff;border:1px solid rgba(20,22,26,.1);border-radius:7px;padding:6px 10px;box-shadow:0 1px 4px rgba(20,22,26,.08)";
+const HEAD_ROW =
+  'padding:10px 16px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px';
+---
+
+<div style="display:flex;flex-direction:column;margin:18px 0 6px">
+  {layers.map((layer, i) => (
+    <>
+      {/* 계층 사이 아래 방향 삼각형. 첫 계층 위에는 없다. */}
+      {i > 0 && (
+        <div
+          style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid rgba(37,99,235,.55);margin:0 auto 5px"
+        />
+      )}
+
+      {i === 0 ? (
+        <div style="border-radius:12px;overflow:hidden;border:1px solid #cddcfb;box-shadow:0 4px 16px rgba(37,99,235,.14)">
+          <div style={`background:#2563eb;${HEAD_ROW}`}>
+            <span style="font:700 11px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#fff">{layer.name}</span>
+            <span style="font-size:11.5px;color:rgba(255,255,255,.88)">{layer.note}</span>
+          </div>
+          <div style="padding:13px 16px;background:#fff;display:flex;gap:8px;flex-wrap:wrap">
+            {layer.items.map((it) => <span style={NODE}>{it}</span>)}
+          </div>
+        </div>
+      ) : (
+        <div style="border:1px solid rgba(20,22,26,.1);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 1px 5px rgba(20,22,26,.05)">
+          <div style={`${HEAD_ROW};background:#f4f7ff;border-bottom:1px solid rgba(20,22,26,.07)`}>
+            <span style="font:700 11px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#17181a">{layer.name}</span>
+            <span style="font-size:11.5px;color:#8a8b90">{layer.note}</span>
+          </div>
+          <div style="padding:13px 16px;background:#fff;display:flex;gap:8px;flex-wrap:wrap">
+            {layer.items.map((it) => <span style={NODE}>{it}</span>)}
+          </div>
+        </div>
+      )}
+    </>
+  ))}
+</div>

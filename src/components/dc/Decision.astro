@@ -1,0 +1,93 @@
+---
+/**
+ * 의사결정 — 기준별 비교 그리드 + 결정 근거.
+ *
+ * 이 문서에서 가장 값어치 있는 블록이다. 무엇을 만들었는지는 누구나 적지만
+ * 왜 그 방식을 골랐는지는 대부분 못 적는다. 원본 PDF 에서는 이 내용이 72ppi 이미지에
+ * 묻혀 검색도 복사도 안 됐다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `직접 호출 vs 이벤트 큐` 덩어리.
+ *
+ * 표가 아니라 CSS Grid(130px 1fr 1fr)다. 원본이 그렇게 짜여 있다.
+ * 선택한 열만 배경을 살짝 파랗게(#eef3ff 머리 · #f8faff 셀) 깔아 눈이 그 열을 따라가게 한다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Option {
+  /** A · B · C */
+  key: string;
+  title: string;
+  chosen: boolean;
+}
+
+interface Props {
+  options: Option[];
+  criteria: Array<{ label: string; values: string[] }>;
+  /** 왜 그것을 골랐는지. 선택지만 늘어놓고 끝내면 판단이 아니라 조사다. */
+  reason: string;
+}
+
+const { options, criteria, reason } = Astro.props;
+const chosen = options.find((o) => o.chosen);
+
+/* 원본이 셀마다 반복하는 style */
+const HEAD_BASE = 'padding:12px 14px;border-bottom:1px solid rgba(20,22,26,.1)';
+const CELL_BASE = 'padding:11px 14px;border-left:1px solid rgba(20,22,26,.06);font-size:12px;line-height:1.5';
+const LABEL_BASE = 'padding:11px 14px;font-size:11.5px;font-weight:700;color:#17181a;background:#f4f5f7';
+/** 마지막 기준행만 아래 테두리가 없다 */
+const ROW_LINE = 'border-bottom:1px solid rgba(20,22,26,.06);';
+---
+
+<div style="border:1px solid rgba(20,22,26,.12);border-radius:14px;overflow:hidden;margin:16px 0">
+  <div style={`display:grid;grid-template-columns:130px ${options.map(() => '1fr').join(' ')}`}>
+    {/* 머리 — 왼쪽 위 빈 칸 + 선택지들 */}
+    <div style={`background:#f4f5f7;${HEAD_BASE}`}></div>
+    {options.map((o) =>
+      o.chosen ? (
+        <div
+          style={`background:#eef3ff;${HEAD_BASE};border-left:1px solid rgba(20,22,26,.08);display:flex;align-items:center;gap:7px;flex-wrap:wrap`}
+        ><span style="font:700 10px 'JetBrains Mono',monospace;color:#2563eb">{o.key}</span>{' '}<span
+            style="font-size:12.5px;font-weight:700;color:#1d4ed8"
+          >{o.title}</span><span
+            style="font:700 8px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#fff;background:#2563eb;border-radius:4px;padding:2px 5px"
+          >채택</span></div>
+      ) : (
+        <div style={`background:#fafafa;${HEAD_BASE};border-left:1px solid rgba(20,22,26,.08)`}
+        ><span style="font:700 10px 'JetBrains Mono',monospace;color:#8a8b90">{o.key}</span>{' '}<span
+            style="font-size:12.5px;font-weight:700;color:#55565a"
+          >{o.title}</span></div>
+      ),
+    )}
+
+    {/* 기준별 행 */}
+    {criteria.map((c, ri) => {
+      const last = ri === criteria.length - 1;
+      const line = last ? '' : ROW_LINE;
+      return (
+        <>
+          <div style={`${LABEL_BASE.replace('padding:11px 14px;', `padding:11px 14px;${line}`)}`}>{c.label}</div>
+          {c.values.map((v, ci) => (
+            <div
+              style={
+                options[ci]?.chosen === true
+                  ? `padding:11px 14px;${line}border-left:1px solid rgba(20,22,26,.06);font-size:12px;line-height:1.5;color:#33343a;background:#f8faff`
+                  : `padding:11px 14px;${line}border-left:1px solid rgba(20,22,26,.06);font-size:12px;line-height:1.5;color:#55565a`
+              }
+              set:html={rich(v)}
+            />
+          ))}
+        </>
+      );
+    })}
+  </div>
+
+  <div
+    style="padding:14px 16px;background:#fff;border-top:1px solid rgba(20,22,26,.1);display:flex;gap:12px;align-items:flex-start"
+  >
+    <span
+      style="font:700 11px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:6px;padding:5px 9px;flex:none"
+    >결정 → {chosen?.key}</span>
+    <span style="font-size:12.5px;line-height:1.62;color:#44454a" set:html={rich(reason)} />
+  </div>
+</div>
