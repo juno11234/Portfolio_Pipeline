@@ -1,6 +1,9 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 
-// 배포처가 확정되면 site/base를 여기에 지정한다.
-// GitHub Pages로 확정 시: site: 'https://<user>.github.io', base: '/<repo>'
-export default defineConfig({});
+// GitHub Pages(프로젝트 페이지) 배포. 공개 URL: https://juno11234.github.io/Portfolio_Pipeline/
+// base 하위경로 때문에 내부 링크는 절대경로 대신 import.meta.env.BASE_URL 로 만든다(Sidebar·Base 참조).
+export default defineConfig({
+  site: 'https://juno11234.github.io',
+  base: '/Portfolio_Pipeline',
+});

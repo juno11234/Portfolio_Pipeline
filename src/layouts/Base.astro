@@ -29,6 +29,9 @@ const {
   activeProject,
   toc = [],
 } = Astro.props;
+
+/** GitHub Pages base 대응. 로컬(base 미설정)=''  ·  배포='/Portfolio_Pipeline'. 끝 슬래시는 벗겨 통일. */
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <!doctype html>
@@ -38,7 +41,7 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href={`${base}/favicon.svg`} type="image/svg+xml" />
 
     {/* 본문 Pretendard, 코드·라벨 JetBrains Mono — 가이드가 권하는 2폰트 구성 */}
     <link
