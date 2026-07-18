@@ -39,13 +39,9 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      # 가능하면 Pages를 자동 활성화(source=GitHub Actions). 조직 정책 등으로 실패하면
-      # 저장소 Settings → Pages → Source: GitHub Actions 를 한 번 수동 설정한다.
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
+      # 참고: Pages 자동 활성화(configure-pages)는 기본 GITHUB_TOKEN 권한으로 막히므로 뺐다.
+      # base 는 astro.config 에 직접 지정하므로 이 스텝의 출력이 필요 없다.
+      # 대신 저장소 Settings → Pages → Source: GitHub Actions 를 한 번 수동 설정한다(필수, 1회).
       - name: Build
         run: npm run build
 
