@@ -1,0 +1,41 @@
+---
+/**
+ * 세로 카드 — {제목, 내용} 카드를 전폭 1열로 세로로 쌓는다.
+ *
+ * **PrincipleCards(3열 격자)의 카드를 그대로 1열로 세운 것이다.** 카드·제목·본문 style 문자열을
+ * PrincipleCards 에서 한 글자도 바꾸지 않고 가져왔다(테두리·반경·padding·글자 크기·색 동일).
+ * 다른 점은 담는 그릇뿐 — `repeat(3,1fr)` 격자 대신 세로 flex 스택이다.
+ *
+ * 왜 있나: 내용이 길어 3열 카드에서 좁게 눌리는 설명(핵심 기능 설명 · 만족 · 개선)을 사용자가
+ * **전폭 세로**로 요청했다(learnings 의 LessonCard 와 같은 결). claude.ai/design 원본엔 이 3종이
+ * 3열밖에 없어, **카드 모양은 원본 그대로 두고 열 수만 1로** 바꾼다. 새 카드 디자인이 아니라 배치 변형이다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Card {
+  title: string;
+  body: string;
+}
+
+interface Props {
+  cards: Card[];
+  /** 바깥 여백. */
+  margin: string;
+}
+
+const { cards, margin } = Astro.props;
+
+/* ↓ PrincipleCards 에서 그대로 가져온 style 3종. 한 글자도 바꾸지 않는다. */
+const CARD = 'border:1px solid rgba(20,22,26,.1);border-radius:11px;padding:15px 15px;background:#fff';
+const TITLE = 'font-size:13.5px;font-weight:700;color:#17181a;margin-bottom:5px';
+const BODY = 'font-size:12px;line-height:1.55;color:#55565a';
+---
+
+<div style={`display:flex;flex-direction:column;gap:10px;margin:${margin}`}>
+  {cards.map((c) => (
+    <div style={CARD}>
+      <div style={TITLE}>{c.title}</div>
+      <div style={BODY} set:html={rich(c.body)} />
+    </div>
+  ))}
+</div>

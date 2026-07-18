@@ -1,110 +1,142 @@
-# 뱀서라이크 기술 문서.
+# 뱀서라이크 기술 문서 — 신 파이프라인(코드→md→YAML)으로 조립했다.
 #
-# 구조는 가이드 Part 2의 5단이고, claude.ai/design 의 두 문서(뱀서라이크·Bond)로 검증했다.
-#   ① overview      개요        — 최상위 필수
-#   ② architecture  시스템 구조 — 문서당 하나
-#   ③ features[]    핵심 기능   — 1..N 그룹. 규모가 크면 나눈다 (Bond 는 4개)
-#   ④ decisions     고민과 선택 — features[].decisions 또는 최상위. 문서 전체에 최소 1건
-#   ⑤ retrospective 결과·회고   — 최상위 필수
+# PDF 에서 옮기던 과도기 판을 걷어내고 **대상 프로젝트의 소스 코드에서 뽑은 세 자료**로 다시 세웠다
+# — 파이프라인의 존재 이유 그대로다(코드→사이트, PDF 없이). v2 로 검증한 뒤 이 판으로 교체했다(사용자 결정).
+#   ① 구현(AI):  src/assets/vampire-like/26_0718_VamSirLike_구현-AI.md  (커밋 819a6ca)
+#   ② 판단(사람): src/assets/vampire-like/2-판단-직접.md
+#   ③ 자산(사람): src/assets/vampire-like/Vampire_captions.md
 #
+# 구조는 가이드 Part 2 의 5단. 스키마는 src/content.config.ts.
+# 레이아웃: 긴 설명은 전폭 세로 카드(points variant:stack · retrospective.stack) · 깨달음은 LessonCard(cells) ·
+#           텍스처 전후는 figure-grid · TSV 툴은 image aside.
+#
+# ⚠ hero 캡션: ③ 원본이 소울라이크 예시로 잘못 들어와 있어 같은 gameplay.png 검증 캡션으로 대체.
+# ⚠ improvements: ②가 아직 테스트 문구라, 실제 개선 5건을 기존 문서(26_0717_TechDoc)에서 이어왔다(아래 주석).
+#   ②를 실제로 채우면 그걸로 교체할 것.
+
 subtitle: 탑뷰 핵 앤 슬래시
+
+# ── ① 개요 ─────────────────────────────────────────────────────────────────
 overview:
-  what: 수백 마리의 적을 **자동 공격**으로 처치하고 경험치를 모아 레벨업하며 스킬을 선택 강화하는 **2D 탑다운 뱀서라이크**입니다.
-  why: 수백 개의 오브젝트가 동시에 존재하는 환경에서는 Instantiate·Destroy와 매 프레임 힙 할당이 쌓여 GC가 자주 호출되고, 그때마다 게임 로직이 멈추는 스파이크가 생깁니다. **GC 최적화**가 핵심 목표입니다.
-  # 원본 PDF '최적화 테스트 결과'의 측정치를 개요로 끌어올렸다.
-  # 가이드: "'느리다' 대신 '로딩 15초'처럼 측정 가능한 문제로."
+  # what = ① A1. why·evidence = ② (사람이 쓴 판단). 지어내지 않았다.
+  what: >-
+    이동만 조작하면 보유 스킬이 쿨타임마다 **자동 발동**해 수백 마리의 적을 처치하고, 적이 떨군 경험치 보석을
+    모아 레벨업하면 게임이 멈추고 스킬 3종 중 하나를 **선택·강화**하는 **2D 탑다운 뱀서라이크**입니다.
+  why: 대량의 오브젝트를 안정적으로 처리하기 위한 **GC 최적화**에 초점을 맞췄습니다.
   evidence: >-
-    최적화 전 기준 프레임당 GC 할당 **196회**, 코루틴 **300개**, Destroy 호출 **501회**, Materials **824개** (Unity Profiler · Profile Analyzer,
-    몬스터 스폰딜레이 0.1초 환경)
-  scope: 의존성 주입과 초기화 순서, 데이터 드리븐 파이프라인, 이벤트 큐 전투 시스템, GC 최적화를 다룹니다. 아트·사운드·레벨 디자인은 이 문서의 범위가 아닙니다.
+    최적화 전후 Unity Profiler·Profile Analyzer 실측 — **GC Alloc In Frame 196회 → 4회 (97%↓)**,
+    **Materials 824개 → 249개 (70%↓)**, 메모리 **140MB** 절감.
+  scope: >-
+    의존성 주입과 초기화 순서, 데이터 드리븐 파이프라인(TSV→ScriptableObject→런타임 딕셔너리), 이벤트 큐 전투
+    시스템, 오브젝트 풀링·GC 최적화 기법, 스킬 시스템, 이벤트 기반 UI, 빌드 자동화를 다룹니다.
+    **아트·사운드·레벨 디자인은 이 문서의 범위가 아닙니다.**
+  # 기술 스택 — ① A1 에서. 코드에서 뽑아 v1(7행)보다 완전한 13행.
   stack:
     title: 데이터 주도 · 무할당을 위한 도구 선택
     rows:
+      - category: 엔진 · 렌더
+        tech: Unity 6000.0.56f1 · URP
+        purpose: 2D SpriteRenderer 기반 탑다운 렌더
       - category: DI 프레임워크
         tech: VContainer
-        purpose: 전역 의존성 주입 및 객체 생명주기 관리
+        purpose: 전역 의존성 주입 · 생명주기 관리(LifetimeScope · IAsyncStartable · ITickable)
       - category: 비동기 처리
         tech: UniTask
         purpose: GC 없는 async/await · 프레임 분산 로딩 · 취소 토큰 연동
       - category: 에셋 관리
-        tech: Addressables
-        purpose: 프리팹·스프라이트·데이터의 비동기 로드 및 명시적 해제
+        tech: Addressables 2.9.0
+        purpose: 데이터 · 프리팹 · 스프라이트의 비동기 로드 및 명시적 Release
       - category: 오브젝트 풀링
-        tech: Unity ObjectPool
-        purpose: 적·투사체·경험치의 재사용으로 GC 스파이크 제거
+        tech: UnityEngine.Pool.ObjectPool
+        purpose: 적 · 투사체 · 경험치 재사용으로 GC 스파이크 제거
+      - category: 입력
+        tech: Unity Input System 1.18.0
+        purpose: 자동 생성 PlayerActions 로 이동 입력 처리
       - category: 데이터
-        tech: ScriptableObject, TSV
-        purpose: 기획 데이터를 코드와 분리한 데이터 드리븐 설계
+        tech: ScriptableObject · TSV
+        purpose: 기획 밸런싱 데이터를 코드와 분리한 데이터 드리븐 설계
+      - category: 텍스트 UI
+        tech: TextMeshPro
+        purpose: SetText 오버로드로 힙 할당 없는 텍스트 갱신
       - category: 셰이더
         tech: ShaderGraph
-        purpose: Shader Graph로 피격시 플래시 효과
+        purpose: 피격 플래시 셰이더 — _Amount 프로퍼티로 스프라이트를 흰색으로 덮음
       - category: material 최적화
         tech: MaterialPropertyBlock
-        purpose: 피격 플래시 효과 시 프로퍼티만 덮어씌워 공유 material 유지
+        purpose: 피격 플래시 시 프로퍼티만 덮어써 공유 material 유지
+      - category: 빌드 자동화
+        tech: GitHub Actions
+        purpose: main 병합 시 클라우드에서 Android 빌드
+      - category: 프로파일링
+        tech: Unity Profiler
+        purpose: 프레임당 GC 할당 · 스파이크 측정으로 최적화 지점 식별
+      - category: 성능 분석
+        tech: Unity Profile Analyzer 1.3.4
+        purpose: Compare 모드로 최적화 전/후 마커별 프레임 분포 비교
+
+# hero = gameplay.png. ③ 캡션이 소울라이크 예시라 같은 이미지의 검증 캡션으로 대체.
 screenshot:
   src: ../../assets/vampire-like/gameplay.png
-  caption: 인게임 플레이 — 화면을 가득 채운 적, 자동 발동 스킬, 경험치 바(Lv.8)
+  caption: 인게임 플레이 — 화면을 가득 채운 적, 자동 발동 스킬, 하단 경험치 바
+
+# meta — 기간·엔진은 ① git·ProjectSettings, team·vcs·ide 는 ③ 확인.
 meta:
   team: 1인
   period: 2026.03.03 ~ 03.18
-  vcs: GitBash CLI, Github Desktop
+  vcs: Github Desktop
   engine: Unity 6000.0.56f1
   ide: Rider 2025.2.1
+
+# links — ③ 자산에서. 추적 파라미터·.git 접미사는 벗겼다.
 links:
   - label: 유튜브
     url: https://youtu.be/kCM6ASBUIEo
   - label: 깃허브
     url: https://github.com/juno11234/VamSirLike
+
+# ── ② 시스템 구조 ─────────────────────────────────────────────────────────
 architecture:
   title: 전체 시스템 구조
+  intro: >-
+    시스템은 조립 루트 → 매니저 → 런타임 객체의 3계층입니다. VContainer가 최상위에서 의존성을 조립하고,
+    데이터 · 전투 · 스폰 · 경험치 · UI 매니저가 그 아래 런타임 객체를 생성 · 등록 · 구독합니다.
   parts:
     - title: 시스템 구조
       lede: 조립 루트 → 매니저 → 런타임 객체의 3계층
       blocks:
         - type: layers
           components: >-
-            조립 루트(GameLifetimeScope) 1개, 매니저 5종(Data · Combat · Spawn · Exp · UI), 그 아래 런타임 객체(플레이어 · 적 · 스킬
-            · 경험치 · UI)
+            조립 루트(GameLifetimeScope) 1개, 매니저 5종(Data · Combat · Spawn · Exp · UI), 그 아래
+            런타임 객체 5종(플레이어 · 적 · 스킬 · 경험치 · UI).
           relations: >-
-            GameLifetimeScope가 매니저를 주입·등록하고, 매니저가 런타임 객체를 생성·등록·구독합니다. 플레이어와 적은 구체 타입이 아닌 **IFighter** 인터페이스로만
-            전투 시스템과 이어집니다.
+            GameLifetimeScope가 매니저를 주입 · 등록하고, 매니저가 런타임 객체를 생성 · 등록 · 구독합니다.
+            플레이어와 적은 구체 타입이 아닌 **IFighter** 인터페이스로만 전투 시스템과 이어집니다.
           flow: >-
-            초기화는 await로 직렬화합니다. DataManager 로드 대기 → PlayerController 조립·스탯 주입 → SpawnManager 풀 준비 대기 →
-            ExpManager 기동. 데이터 로드 전에 플레이어가 생성되는 경쟁 조건을 순서로 차단합니다.
+            초기화를 await로 직렬화합니다. DataManager 로드 대기 → PlayerController 조립 · 스탯 주입 →
+            SpawnManager 풀 준비 대기 → ExpManager 기동. 데이터 로드 전 플레이어가 생성되는 경쟁 조건을 순서로 차단합니다.
           layers:
             - name: 조립 루트
               items:
                 - name: GameLifetimeScope
-                  note: DI Root · EntryPoint
             - name: 매니저
               edge: INJECT · REGISTER
               items:
                 - name: DataManager
-                  note: 데이터 허브
                 - name: CombatSystem
-                  note: 전투 이벤트 큐 · 허브
                   emphasis: true
                 - name: SpawnManager
-                  note: 웨이브 · 풀링
                 - name: ExpManager
-                  note: 경험치 · 풀링
                 - name: UIManager
-                  note: HUD · 이벤트
             - name: 런타임 객체
               edge: 생성 · 등록 · 구독
               items:
                 - name: PlayerController
-                  note: «IFighter»
                 - name: EnemyController
-                  note: «IFighter»
                 - name: SkillManager
-                  note: SkillBase 계층
                 - name: ExpItem
-                  note: 자석 이동
                 - name: LevelUpUI
-                  note: 스킬 선택
     - title: 전투 계약 — IFighter
-      lede: 데미지를 주고받을 수 있는 모든 객체의 공통 계약입니다. 전투 로직은 구체 타입을 모릅니다.
+      lede: 데미지를 주고받는 모든 객체의 공통 계약입니다. 전투 로직은 구체 타입을 모릅니다.
       blocks:
         - type: mermaid
           question: 전투 시스템은 무엇으로 이루어졌고 서로 어떻게 이어지나?
@@ -131,24 +163,23 @@ architecture:
                     +RegisterMonster(IFighter)
                     +GetMonster(Collider2D) IFighter
                 }
-                class PlayerController {
-                    +float MaxHp
-                    +float CurrentHp
-                    +event OnHpChanged
-                    +event OnDeath
-                }
-                class EnemyController {
-                    -EnemyStat _stat
-                    -float _currentHp
-                    +Setup(...)
-                }
                 class SkillBase {
                     <<abstract>>
                     #CombatSystem CombatSystem
                     #IFighter Sender
                     #float Damage
+                    #float Cooldown
                     +Init(...)
                     +LevelUp(SkillData)
+                }
+                class PlayerController {
+                    +float MaxHp
+                    +event OnHpChanged
+                    +event OnDeath
+                }
+                class EnemyController {
+                    -EnemyStat _stat
+                    +Setup(...)
                 }
 
                 IFighter <|.. PlayerController
@@ -157,60 +188,138 @@ architecture:
                 SkillBase <|-- ProjectileTargetScanner
                 SkillBase <|-- BoomerangManager
                 SkillBase <|-- SpiralManager
-
                 CombatSystem --> InGameEvent : 큐에 저장
                 CombatSystem --> IFighter : 디스패치
                 SkillBase --> CombatSystem : 이벤트 발행
+
+# ── ③ 핵심 기능 ───────────────────────────────────────────────────────────
 features:
   - title: 핵심 기능
     parts:
+      # 1
       - title: 의존성 주입 & 초기화
-        lede: 의존 순서를 await로 직렬화해 데이터 로드 전 플레이어 생성 같은 경쟁 조건을 원천 차단했습니다.
-        blocks:
-          - type: points
-            items:
-              - title: 01 await DataManager
-                body: 데이터 로드 대기
-              - title: 02 PlayerController
-                body: 플레이어 조립 · 스탯 주입
-              - title: 03 await SpawnManager
-                body: 스폰 풀 준비 대기
-              - title: 04 ExpManager.Init()
-                body: 경험치 시스템 기동
-      - title: 데이터 임포트 툴
-        lede: 스프레드시트에서 작업한 밸런싱 데이터(TSV)를 클릭 한 번으로 유니티에 자동 연동하는 커스텀 에디터 툴입니다.
-        blocks:
-          - type: points
-            items:
-              - title: 전용 임포터
-                body: VamSir Tools ▸ Data Importer 메뉴로 열리는 EditorWindow.
-              - title: 파싱 · 검증
-                body: 탭 기준 파싱, 헤더 2줄 skip. 컬럼 수 검증, LogError로 잘못된 행 즉시 진단.
-              - title: 에디터 안전성
-                body: Undo.RecordObject · SetDirty로 Undo·저장 보장, delayCall로 변경 충돌 회피
-      - title: 데이터 매니저
-        lede: 게임 시작 시 데이터 컨테이너를 비동기 로드하고, 직렬화에 유리한 List로 임포트한 데이터를 조회가 빠른 Dictionary로 재가공합니다.
-        blocks:
-          - type: points
-            items:
-              - title: List → Dictionary
-                body: 저장은 List, 런타임 조회는 O(1) Dictionary
-              - title: Addressables
-                body: 데이터 컨테이너를 씬에 올리지 않고 필요할 때 비동기 로딩
-              - title: IDisposable
-                body: 생명주기 종료 시 Addressables.Release()로 명시적 메모리 해제
-      - title: 이벤트 큐 전투 시스템
-        lede: 개별 객체가 직접 처리하지 않고 큐로 전투 판정을 순차 처리하는 전투 시스템을 구현하였습니다.
+        lede: >-
+          의존 순서를 `await`로 직렬화해 데이터 로드 전 플레이어 생성 같은 경쟁 조건을 원천 차단했습니다.
+          순수 C# 클래스는 `Register`, 씬의 MonoBehaviour는 `RegisterComponent`로 구분 등록합니다.
         blocks:
           - type: code
-            api: combatSystem.AddInGameEvent(evt)
-            lang: csharp
+            api: GameLifetimeScope.cs · Configure()
+            code: |-
+              builder.Register<DataManager>(Lifetime.Singleton);      // 순수 C# 클래스
+              builder.Register<CombatSystem>(Lifetime.Scoped)         // 이 씬만(Scope)
+                  .AsImplementedInterfaces()                          // ITickable 명찰 등록
+                  .AsSelf();                                          // 본명 등록
+              builder.RegisterComponent(spawnManager);                // 씬에 이미 있는 MonoBehaviour
+              builder.RegisterComponent(playerController);
+              builder.RegisterEntryPoint<GameInitializer>();
+            notes:
+              - at: AsImplementedInterfaces
+                why: >-
+                  CombatSystem을 ITickable로 잡히게 해 VContainer가 매 프레임 Tick()을 호출한다.
+                  이 등록이 없으면 전투 이벤트 큐가 영영 비워지지 않는다.
+              - at: RegisterComponent
+                why: 씬에 이미 존재하는 MonoBehaviour 인스턴스를 그대로 컨테이너에 넣는다. 순수 C# 클래스(Register)와 구분된다.
+          - type: code
+            api: GameInitializer.cs · StartAsync() · IAsyncStartable
+            code: |-
+              await _dataManager.InitializeAsync(cancellationToken);
+              cancellationToken.ThrowIfCancellationRequested();
+              PlayerStat warriorStat = _dataManager.GetPlayerStat(PlayerWarriorId); // 3001
+              _playerController.Initialize(warriorStat, _combatSystem, _dataManager);
+              await _spawnManager.InitAsync(_playerController, _combatSystem, _expManager, _dataManager, cancellationToken);
+              _expManager.Init();
+            notes:
+              - at: await 직렬화
+                why: 데이터 로드가 끝나야 플레이어 스탯을 세팅할 수 있어 순서를 강제한다.
+              - at: PlayerWarriorId
+                why: 플레이어 직업 ID(3001)가 상수로 하드코딩돼 있다. 현재 전사만 쓰고 JobType.Mage는 진입 경로가 없다.
+          - type: callout
+            badge: 주의
+            tone: tint
+            title: timeScale=0 이면 딜레이도 함께 멈춘다
+            body: >-
+              이 프로젝트의 모든 `UniTask.Delay`는 `ignoreTimeScale` 기본값(false)입니다. 레벨업 · 게임오버로
+              `Time.timeScale = 0`이 되면 스폰 간격 · 연사 딜레이 · 피격 무적 대기도 함께 멈춥니다. (의도된 동작)
+      # 2
+      - title: 데이터 파이프라인 — TSV 임포트 · DataManager
+        lede: >-
+          스프레드시트에서 작업한 밸런싱 데이터(TSV)를 커스텀 에디터 툴로 `ScriptableObject`에 담고,
+          런타임에는 조회가 빠른 딕셔너리로 재가공합니다.
+        blocks:
+          # 원본 472×257 라 본문 폭까지 늘리면 깨진다 → aside 로 폭 고정(캡션은 옆).
+          - type: image
+            src: ../../assets/vampire-like/ImportTool.png
+            variant: aside
+            width: 440
+            label: EDITOR TOOL
+            caption: VamSir Tools ▸ Data Importer — TSV를 ScriptableObject로 임포트하는 커스텀 EditorWindow
+          - type: points
+            items:
+              - title: DataImporter (에디터)
+                body: >-
+                  VamSir Tools ▸ Data Importer 메뉴의 EditorWindow. 탭 분리 파싱, 2줄 헤더(타입 행 · 한글명 행)라
+                  루프가 i=2부터 시작. delayCall로 GUI 충돌 회피, Undo.RecordObject + SetDirty. 플레이어(6칸) · 스킬(12칸)은 칸 수 검증.
+              - title: DataManager (런타임)
+                body: >-
+                  Addressables.LoadAssetAsync로 GameDataContainer를 로드한 뒤 List를 3종 Dictionary로 재가공.
+                  IDisposable로 스코프 종료 시 Release.
+          - type: code
+            api: DataManager.cs · GetSkillList()
+            code: |-
+              public List<SkillData> GetSkillList()
+              {
+                  _skillList.Clear();                                 // 새 리스트 대신 필드 재사용(GC 절감)
+                  foreach (var skills in _container.SkillData)
+                      if (skills.job is JobType.Warrior) _skillList.Add(skills);
+                  return _skillList;
+              }
+            notes:
+              - at: _skillList.Clear()
+                why: >-
+                  매 호출 새 리스트 할당을 피해 필드를 재사용한다. 호출자가 반환 리스트를 셔플해도 다음 호출에서
+                  Clear 후 다시 채워져 동작엔 문제없다.
+          - type: image
+            src: ../../assets/vampire-like/data-importer.png
+            label: CODE
+            caption: 탭 분리 파싱 — 2줄 헤더를 건너뛰고 칸 수를 검증하는 임포트 코드
+          - type: table
+            headers:
+              - ID 대역
+              - 클래스
+              - 주요 필드
+            rows:
+              - - 1001~
+                - EnemyStat
+                - id · name · hp · atk · speed · attackType
+              - - 3001~
+                - PlayerStat
+                - id · name · baseHp · baseAtk · baseSpeed · baseCooldown
+              - - 4001~
+                - SkillData
+                - id · name · job · enhanceType · baseAtk · cooldown · maxLevel · atkPerLevel · description · prefabKey
+              - - 5001~
+                - StatLevelUp
+                - id · name · increaseStatPer · minLevel · maxLevel · statType
+          - type: callout
+            badge: 사실
+            tone: white
+            body: >-
+              스킬 TSV의 6번 인덱스(최소 레벨)는 코드에서 읽지 않고 건너뜁니다. `AssetDatabase.SaveAssets()`는
+              주석 처리돼 있어, `SetDirty` 후 수동/자동 저장이 있어야 디스크에 반영됩니다.
+      # 3
+      - title: 이벤트 큐 전투 시스템
+        lede: >-
+          개별 객체가 대상을 직접 때리지 않고, 모든 데미지를 `InGameEvent` 구조체로 큐에 넣어
+          프레임당 한 곳에서 순차 처리합니다.
+        blocks:
+          - type: code
+            api: CombatSystem.cs · Tick()
             code: |-
               public void Tick()
               {
-                  while (_eventQueue.Count > 0)   // 큐가 빌 때까지 한 프레임에 모두 소비
+                  while (_eventQueue.Count > 0)     // 큐가 빌 때까지 한 프레임에 모두 소비
                   {
-                      var e = _eventQueue.Dequeue();
+                      InGameEvent e = _eventQueue.Dequeue();
                       switch (e.Type)
                       {
                           case EventType.Combat: e.Receiver.TakeDamage(e); break;
@@ -222,78 +331,73 @@ features:
               - at: while 루프
                 why: 한 프레임에 쌓인 전투 이벤트를 전부 소비한다. 지연은 최대 1프레임이 아니라 사실상 0이다.
               - at: Dequeue
-                why: 처리 지점이 프레임당 한 곳이라 피격 이펙트·사운드를 여기서 일괄 후킹할 수 있다.
-              - at: VContainer
-                why: CombatSystem을 AsImplementedInterfaces로 등록해 ITickable로 잡히게 했다. 이 등록이 없으면 큐가 영영 안 비워진다.
-          - type: points
-            items:
-              - title: IFighter 인터페이스
-                body: 플레이어와 적이 같은 인터페이스를 상속해 전투 로직에서 양쪽을 동일하게 취급
-              - title: 단일 지점 이벤트 처리
-                body: InGameEvent 처리가 프레임당 한 곳. 디버깅·밸런싱·확장 용이
-              - title: 구조체 InGameEvent
-                body: InGameEvent를 struct로 설계해 힙 할당 방지
-      - title: 플레이어 & 몬스터
-        lede: IFighter 인터페이스를 상속하여 전투 시스템을 사용하는 플레이어와 몬스터를 구현합니다.
+                why: 처리 지점이 프레임당 한 곳이라 피격 이펙트 · 사운드를 여기서 일괄 후킹할 수 있다.
+          - type: mermaid
+            question: 발행된 데미지는 어디로 모여 처리되나?
+            source: |
+              flowchart TD
+                  P["생산자 · CircleAttack · ProjectileAttack · BoomerangProjectile · SpiralProjectile · EnemyController"] -->|"AddInGameEvent()"| Q["_eventQueue"]
+                  Q -->|"Tick() · 프레임당 큐 소비"| D["Dequeue · switch(e.Type)"]
+                  D -->|Combat| C["Receiver.TakeDamage(e)"]
+                  D -->|Heal| H["Receiver.Heal(e)"]
+                  C --> R["수신자 · Player · Enemy"]
+                  H --> R
+          - type: callout
+            badge: 사실
+            tone: white
+            body: >-
+              몬스터 등록 · 해제는 풀의 `createFunc`(RegisterMonster) · `actionOnDestroy`(RemoveMonster)에 걸립니다.
+              `Max_Event_Count`(1000) 상수와 주입된 `_dataManager` · `EventCallback`은 현재 사용처 · 구독자가 없습니다.
+      # 4
+      - title: 플레이어 & 적 — IFighter
+        lede: 플레이어와 적이 같은 `IFighter`를 상속해 전투 로직이 양쪽을 동일하게 취급합니다.
         blocks:
           - type: points
             items:
-              - title: PlayerController — 이동, 수집
-                body: OnScreenStick의 Control Path를 게임패드 LeftStick으로 지정, OverlapCircle로 경험치 자석 효과
-              - title: EnemyController — 주입, 풀 재사용
-                body: Setup()으로 스폰 매니저가 타겟·스탯·반납 콜백을 주입
-              - title: 이벤트 기반
-                body: OnHpChanged, OnDeath 등으로 이벤트 기반 UI 갱신
-              - title: 무적 효과
-                body: 피격 시 UniTask.Delay로 일정 시간 동안 무적
-              - title: 사망 위임
-                body: _onDeathCallback으로 풀 반납 + 경험치 드롭. 직접 Destroy 하지 않음
-              - title: ShaderGraph 피격 효과
-                body: SpriteRenderer.color는 곱셈이라 흰 실루엣이 불가능. lerp 노드가 필요
-      - title: 스폰 매니저 & 오브젝트 풀
-        lede: 게임 시작 시 오브젝트 풀을 생성하고 런타임에 몬스터 스폰 루프를 실행하는 매니저를 구현하였습니다.
-        blocks:
-          - type: points
-            items:
-              - title: 독립 풀
-                body: 적 종류별로 개별 Dictionary 관리
-              - title: 프리웜
-                body: 미리 50개를 생성하여 Instantiate 부하 시점을 초기 구간으로 이전
-              - title: 콜백 결합
-                body: 반납 콜백에 경험치 드롭을 결합, 적이 풀로 돌아갈 때 경험치 스폰
-              - title: 비동기 스폰 루프
+              - title: PlayerController
                 body: >-
-                  웨이브마다 독립 루프를 Forget()으로 실행해 여러 웨이브 동시 진행. OnDestroy에서 cts.Cancel() + Release()로 씬 전환 시 안전
-                  정리
-      - title: 스킬 시스템
-        lede: SkillBase 추상 클래스로 공통 상태를 정의하고 override로 확장합니다. 레벨업 후 최초로 해당 무기 획득 시 Addressables로 동적 장착합니다.
-        blocks:
+                  transform.position 직접 대입 이동(물리 미사용) + Mathf.Clamp 경계 제한. OverlapCircle(반경 4)
+                  경험치 자석. 피격 시 UniTask.Delay 무적 + MaterialPropertyBlock 플래시.
+              - title: EnemyController
+                body: >-
+                  Setup()으로 스폰 매니저가 타겟 · 스탯 · 반납 콜백 · 전투 시스템을 주입. 경로 탐색 없이 직선 추적,
+                  사거리 안이면 멈추고 쿨타임마다 공격. 직접 Destroy 하지 않고 _onDeathCallback으로 풀 반납 + 경험치 드롭.
+              - title: 이벤트 기반 UI
+                body: OnHpChanged · OnDeath로 폴링 없이 갱신.
+          - type: image
+            src: ../../assets/vampire-like/shadergraph-flash.png
+            label: SHADER GRAPH
+            caption: >-
+              HitFlash ShaderGraph — _Amount 프로퍼티로 스프라이트를 흰색으로 덮는 피격 플래시. SpriteRenderer.color는
+              곱셈이라 흰 실루엣이 불가능해 lerp 노드가 필요하다.
           - type: table
             headers:
-              - 무기 이름
-              - 스킬
-              - 레벨업 효과
-              - 공격 방식
+              - ID
+              - 이름
+              - 체력
+              - 공격력
+              - 이동속도
+              - 공격타입
             rows:
-              - - Dagger
-                - 투사체
-                - 발사 개수+
-                - 가장 가까운 적 자동 조준 · 순차 연사
-              - - Hammer
-                - 부메랑
-                - 데미지+ 쿨타임-
-                - 던졌다 돌아오며 상태 변환 관통 타격
-              - - BattleAxe
-                - 나선 회전
-                - 발사 개수+
-                - 삼각함수 나선 궤도로 확산
-              - - Sword
-                - 원형 범위
-                - 데미지+ 범위+
-                - 플레이어 중심으로 주변 광역 공격
+              - ["1001", Rat, "10", "10", "5", Melee]
+              - ["1002", Spider, "30", "15", "6", Melee]
+              - ["1003", Ghost, "75", "20", "7", Melee]
+              - ["1004", Warlock, "50", "20", "5", Ranged]
+              - ["1005", Cyclops, "300", "30", "5", Boss]
+          - type: callout
+            badge: 사실
+            tone: white
+            body: >-
+              `EnemyStat.attackType`(Ranged · Boss)이 데이터엔 있으나 EnemyController가 분기에 쓰지 않아
+              현재 모든 적이 근접 행동만 합니다. `EnemyController.Heal()`은 빈 구현입니다.
+      # 5
+      - title: 스킬 시스템 — SkillBase 계층
+        lede: >-
+          `SkillBase` 추상 클래스로 공통 상태를 정의하고 `override`로 확장합니다.
+          레벨업 후 최초 획득 시 Addressables로 프리팹을 동적 장착합니다.
+        blocks:
           - type: code
-            api: skillManager.AddOrLevelUpWeaponAsync(skillId)
-            lang: csharp
+            api: SkillBase.cs · LevelUp()
             code: |-
               public virtual void LevelUp(SkillData skillData)
               {
@@ -304,92 +408,244 @@ features:
               }
             notes:
               - at: virtual
-                why: 기본은 데미지·쿨타임만 올린다. 반경 증가나 투사체 수 증가는 파생 클래스가 override 한다.
+                why: >-
+                  기본은 데미지 · 쿨타임만 올리고, 반경 증가(CircleAttack) · 투사체 수 증가(ProjectileTargetScanner ·
+                  SpiralManager)는 파생 클래스가 override 한다.
               - at: Mathf.Max
                 why: 쿨타임이 0 이하로 내려가 매 프레임 발사되는 것을 막는 하한이다.
               - at: 0.5f
                 why: 데이터가 아닌 코드 상수다. SkillSelectButton의 표시 로직에도 같은 값이 복제돼 있어 한쪽만 바꾸면 어긋난다. (기술 부채)
-      - title: 조준 & 타격 최적화
-        lede: 가장 가까운 적을 찾거나 경험치 아이템 자석 효과를 활성화하는 원형 범위를 가비지 없이 구현하였습니다.
+          - type: table
+            headers:
+              - 무기(ID)
+              - 구현 클래스
+              - 공격 방식
+              - 대상 선택
+              - 레벨업 효과
+            rows:
+              - - GreatSword(4001)
+                - CircleAttack
+                - OverlapCircle 주기 광역
+                - 반경 내 전체
+                - 데미지↑ · 쿨타임↓ · 반경↑
+              - - Dagger(4002)
+                - ProjectileTargetScanner
+                - Raycast 직선 투사체
+                - 최근접 1체 자동 조준
+                - 데미지↑ · 쿨타임↓ · 발사 수 +1
+              - - BattleAxe(4003)
+                - SpiralManager
+                - OverlapCircle 나선 궤도
+                - 무지향(나선 확산)
+                - 데미지↑ · 쿨타임↓ · 발사 수 +1
+              - - Hammer(4004)
+                - BoomerangManager
+                - OverlapCircle 왕복
+                - 최근접 1체(없으면 랜덤)
+                - 데미지↑ · 쿨타임↓
+          - type: mermaid
+            question: 스킬 획득과 강화는 어떻게 분기하나?
+            source: |
+              flowchart TD
+                  S["GetSkillData(id)"] -->|null| X["반환 · 무시"]
+                  S -->|존재| H["_activeWeapons 보유?"]
+                  H -->|있음| L["LevelUp(skillData)"]
+                  H -->|없음| I["InstantiateAsync(prefabKey)"]
+                  I --> N["Init(...)"]
+                  N --> A["_activeWeapons.Add"]
+          - type: callout
+            badge: 사실
+            tone: white
+            body: >-
+              Mage 스킬 4종(4005~4008: ReleaseMagic · FireBall · LightningChain · IceMagic)은 TSV엔 있으나
+              `JobType.Mage` 진입 경로가 없어 미사용입니다.
+      # 6
+      - title: 스폰 & 오브젝트 풀
+        lede: 게임 시작 시 풀을 미리 채우고(프리웜), 웨이브마다 독립 비동기 루프로 적을 스폰합니다.
         blocks:
           - type: points
             items:
-              - title: GC 최적화
-                body: ContactFilter2D + 사전 할당 버퍼로 GC 할당 제로
-              - title: 터널링 방지
-                body: 투사체는 이동 전 Raycast로 궤적을 검사해 터널링 방지 처리
+              - title: 독립 풀 · 프리웜
+                body: >-
+                  적 프리팹별 ObjectPool(capacity 50 · max 500). 초기화 때 50개를 미리 생성 · 반납해
+                  Instantiate 부하를 초기 구간으로 이전.
+              - title: 콜백 캐싱
+                body: 반납 콜백에 경험치 드롭을 결합하고 _releaseActions 딕셔너리에 캐싱해 적 사망마다 람다 재할당을 방지.
+              - title: 동시 웨이브
+                body: >-
+                  웨이브마다 SpawnLoopAsync를 Forget()으로 실행해 동시 진행. _playTime은 Time.deltaTime
+                  누적이라 timeScale=0이면 함께 정지.
+              - title: 스폰 위치 · 안전 정리
+                body: 플레이어 중심 반경 15 원주 위 무작위 지점(카메라 밖). OnDestroy에서 _cts.Cancel() + 프리팹 Release.
+          - type: mermaid
+            question: 적 한 마리는 풀 안에서 어떤 상태를 오가나?
+            source: |
+              stateDiagram-v2
+                  [*] --> Idle: createFunc · RegisterMonster
+                  Idle --> Active: Get + Setup
+                  Active --> Chase
+                  Chase --> Attack: 사거리 안
+                  Attack --> Chase: 사거리 밖
+                  Chase --> Hit: TakeDamage
+                  Attack --> Hit: TakeDamage
+                  Hit --> Chase: HP 남음
+                  Hit --> Idle: HP 0 이하 · 경험치 드롭 + Release
+                  Idle --> [*]: actionOnDestroy · RemoveMonster
+          - type: table
+            headers:
+              - 풀
+              - 소유자
+              - capacity
+              - maxSize
+              - 프리웜
+              - 컨테이너
+            rows:
+              - [적, SpawnManager(프리팹별), "50", "500", "50", SpawnManager 자신]
+              - [자동 투사체, ProjectileTargetScanner, "20", "100", "20", ProjectileContainer]
+              - [부메랑, BoomerangManager, "10", "10", "10", BoomerangContainer]
+              - [나선 투사체, SpiralManager, "10", "20", "20", SpiralContainer]
+              - [경험치 보석, ExpManager, "50", "300", "50", ExpContainer]
+      # 7
+      - title: 경험치 & 레벨업
+        lede: 적이 떨군 보석이 플레이어에게 빨려와 경험치가 되고, 누적치가 임계에 닿으면 레벨업합니다.
+        blocks:
+          - type: code
+            api: ExpManager.cs · AddExp()
+            code: |-
+              CurrentExp += amount;
+              Score      += amount;                 // 게임오버 점수로 사용
+              while (CurrentExp >= RequiredExp)      // 한 번에 큰 경험치면 연속 레벨업
+              {
+                  CurrentExp -= RequiredExp;
+                  CurrentLevel++;
+                  RequiredExp = baseRequiredExp * CurrentLevel * 1.5f;
+                  OnLevelUp?.Invoke(CurrentLevel);
+              }
+            notes:
+              - at: while 루프
+                why: 한 번에 큰 경험치를 얻으면 연속 레벨업이 가능하며 그만큼 OnLevelUp이 여러 번 발행된다.
+              - at: baseRequiredExp * level * 1.5f
+                why: 필요 경험치 증가 공식이다. 초기값은 baseRequiredExp(기본 100)다.
+          - type: table
+            headers:
+              - 레벨
+              - 필요 경험치
+            rows:
+              - ["1 → 2", 100 (초기값)]
+              - ["2 → 3", 100 × 2 × 1.5 = 300]
+              - ["3 → 4", 100 × 3 × 1.5 = 450]
+              - ["4 → 5", 100 × 4 × 1.5 = 600]
+          - type: callout
+            badge: 사실
+            tone: white
+            body: >-
+              `ExpItem`은 SetTarget 전까지 제자리에 있다가, 지정되면 MoveTowards(속도 15)로 비행해 거리²<0.25면
+              수집 콜백을 부릅니다. 보석 풀은 50/300, 50개 프리웜, 모두 런타임 생성 ExpContainer의 자식입니다.
+      # 8
       - title: UI 시스템
-        lede: 상태가 변할 때만 UI를 갱신하고 Addressables 핸들을 추적해 네이티브 메모리 누수를 막았습니다.
+        lede: 상태가 변할 때만 UI를 갱신하고, Addressables 핸들을 추적해 네이티브 메모리 누수를 막았습니다.
         blocks:
           - type: points
             items:
               - title: UIManager
-                body: '[Inject] 메서드 주입으로 의존 확보 후 이벤트 구독. HP·경험치·레벨을 폴링 없이 이벤트로만 갱신'
+                body: >-
+                  [Inject] 메서드 주입으로 PlayerController · ExpManager 이벤트를 구독, 폴링 없이 HP · 경험치 · 레벨을
+                  갱신. 시간 텍스트는 초가 바뀔 때만 TMP.SetText로 갱신(문자열 할당 제거). HP 바는 LateUpdate에서
+                  WorldToScreenPoint로 추종.
               - title: LevelUpUI
-                body: 레벨업 시 timeScale=0으로 정지, Fisher-Yates 셔플로 무작위 3종 제시
+                body: 레벨업 시 timeScale=0, GetSkillList()를 Fisher-Yates 셔플해 3종 제시. 선택 시 timeScale=1 + AddOrLevelUpWeaponAsync.
               - title: SkillSelectButton
-                body: 아이콘 이미지를 Addressable로 로드하며 핸들을 보관. 파괴 시 반드시 Release하여 네이티브 메모리 누수 방지
-              - title: 텍스트 갱신
-                body: Timer는 TMP의 SetText로 char 단위로 쪼개 배열 재활용, 힙 할당 없이 텍스트 갱신
-      - title: 빌드 자동화 파이프라인
-        lede: 메인 브랜치 병합 시 GitHub 서버가 자동으로 Android APK를 빌드하도록 환경을 통일·자동화했습니다.
+                body: >-
+                  스킬 ID→아이콘 매핑이 switch에 하드코딩(4001→106 · 4002→103 · 4003→119 · 4004→117). 아이콘을
+                  Addressable로 로드하며 핸들 보관, 파괴 · 재초기화 시 IsValid() 후 Release.
+              - title: LobbyUIButton
+                body: 씬 전환 전 timeScale==0이면 1로 복구 후 LoadScene — 게임오버 정지가 다음 씬으로 이어지지 않게.
+          - type: chips
+            variant: state
+            items:
+              - { label: OnLevelUp, arrow: → }
+              - { label: timeScale=0, arrow: → }
+              - { label: 패널 활성, arrow: → }
+              - { label: GetSkillList() + 셔플, arrow: → }
+              - { label: 스킬 3종 제시, arrow: → }
+              - { label: 클릭 · OnSkillSelected, arrow: → }
+              - { label: 패널 닫기 · timeScale=1, arrow: → }
+              - { label: AddOrLevelUpWeaponAsync }
+          - type: callout
+            badge: 사실
+            tone: white
+            body: >-
+              `UIManager.OnDestroy`는 ExpManager 이벤트는 해제하나 PlayerController의 OnHpChanged · OnDeath 구독은
+              해제하지 않습니다. 최대 레벨 스킬도 후보에서 제외되지 않으나 선택 시 maxLevel 가드로 변화 없이 반환됩니다.
+      # 9
+      - title: GC 스파이크 제거 기법
+        lede: 수백 개 오브젝트가 동시에 존재하는 환경에서 프레임당 힙 할당을 없애려 코드 전반에 적용한 기법들입니다.
+        blocks:
+          - type: points
+            variant: check
+            items:
+              - title: 오브젝트 풀 + 프리웜
+                body: 런타임 중 Instantiate · Destroy 제거
+              - title: 풀 반납 콜백 캐싱
+                body: 사망 시 콜백을 딕셔너리에 캐싱해 클로저 힙 할당 방지
+              - title: 버퍼 재사용 물리 쿼리
+                body: ContactFilter2D + 사전 할당 배열 재활용, 거리 비교는 sqrMagnitude
+              - title: TMP 배열 재활용
+                body: SetText로 char 단위 배열 재활용
+              - title: UniTask로 코루틴 대체
+                body: 열거자 객체 힙 할당 제거
+              - title: 구조체 이벤트
+                body: InGameEvent를 struct로 설계
+              - title: MaterialPropertyBlock
+                body: 피격 플래시 시 공유 material 인스턴싱 방지
+      # 10
+      - title: 빌드 자동화 — GitHub Actions CI
+        lede: main 병합 시 GitHub 서버가 자동으로 Android 빌드를 수행하도록 환경을 통일 · 자동화했습니다.
         blocks:
           - type: points
             items:
               - title: 자동 트리거
-                body: main 병합 시 클라우드에서 APK 자동 빌드
+                body: main 병합 시 클라우드에서 Android 빌드(.github/workflows)
               - title: 환경 통일
-                body: 로컬 PC 점유·환경 편차로 인한 빌드 차이 제거
+                body: 로컬 PC 점유 · 환경 편차로 인한 빌드 차이 제거
               - title: Secrets 암호화
-                body: 라이선스·계정을 하드코딩 대신 Secrets 변수로
-              - title: Game CI
-                body: 검증된 유니티 빌드 액션으로 파이프라인 구성
-      - title: 여섯 가지 적용
-        blocks:
-          - type: points
-            items:
-              - title: 01 오브젝트 풀 + 프리웜 적용
-                body: 오브젝트 풀을 적용하여 런타임 중 Instantiate, Destroy 제거
-              - title: 02 풀 반납 콜백 캐싱
-                body: 몬스터 사망 시 풀 반납 콜백을 딕셔너리에 캐싱하여 클로저의 힙 할당을 방지
-              - title: 03 버퍼 재사용 물리 쿼리
-                body: OverlapCircle에 ContactFilter2D와 사전 선언 배열을 재활용해 신규 배열 생성 방지
-              - title: 04 TMP 배열 재활용
-                body: TMP의 SetText로 char 단위로 쪼개 배열 재활용, 힙 할당 없이 텍스트 갱신
-              - title: 05 UniTask로 코루틴 대체
-                body: 코루틴 대신 UniTask를 활용하여 열거자 객체의 힙 할당 제거
-              - title: 06 구조체 활용
-                body: 전투 이벤트가 빈번하게 발생해도 힙 할당 & GC 방지
-      - title: 최적화 테스트 결과
+                body: 라이선스 · 계정을 하드코딩 대신 GitHub Secrets로
+      # 11
+      - title: GC 최적화 결과
         lede: >-
-          사용 툴: Unity Profiler, Profile Analyzer · 테스트 환경: 몬스터 스폰딜레이 0.1초, 10초와 15초 구간에 몬스터 바리에이션 추가, 플레이어
-          체력 1000 고정
+          사용 툴: Unity Profiler · Profile Analyzer. 테스트 환경 — 몬스터 스폰딜레이 0.1초, 10 · 15초 구간에
+          몬스터 바리에이션 추가, 플레이어 체력 1000 고정.
         blocks:
           - type: image
             src: ../../assets/vampire-like/profiler-compare.png
             label: PROFILER
-            caption: >-
-              Profile Analyzer Compare 모드 — 최적화 전(Left)과 후(Right)의 마커별 중앙값 차이.
-              SpawnLoopCoroutine·FireCoroutine 등 코루틴 마커가 오른쪽에서 사라졌다.
+            caption: Profile Analyzer Compare 모드 — 최적화 전(좌)과 후(우)의 마커별 중앙값 · 프레임 분포 비교
           - type: metrics
             items:
               - label: GC Alloc In Frame
-                before: '196'
-                after: '4'
+                before: "196"
+                after: "4"
                 delta: 97% 감소
-              - label: 코루틴
-                before: '300'
-                after: '0'
-                delta: 100% 감소
-              - label: Destroy 호출
-                before: '501'
-                after: '0'
-                delta: 100% 감소
               - label: Materials
-                before: '824'
-                after: '249'
+                before: "824"
+                after: "249"
                 delta: 70% 감소
-    decisions: []
+      # 12
+      - title: 트러블슈팅 — 픽셀아트 텍스처 압축
+        lede: >-
+          에디터에서 선명하던 픽셀아트가 Android 빌드 후 색이 뭉개졌습니다. 압축 포맷이 인접 픽셀을 블록으로
+          묶어, 색 차이가 큰 픽셀아트는 정보가 훼손됩니다.
+        blocks:
+          # 원본 166×143 · 150×126 로 아주 작다 → 세로로 쌓으면 본문 폭까지 5배 늘어나 깨진다.
+          # 2열(figure-grid)로 나란히 두면 폭이 절반이라 덜 늘고, before/after 가 한눈에 든다.
+          - type: figure-grid
+            cells:
+              - src: ../../assets/vampire-like/tex-compressed-result.png
+                caption: '!!BEFORE!! 압축 — 인접 픽셀이 블록으로 묶여 색이 뭉개짐'
+              - src: ../../assets/vampire-like/tex-uncompressed-result.png
+                caption: '==AFTER== RGBA 32bit 무압축 — 원본 색 복원'
+
+# ── ④ 고민과 선택 (② 사람이 쓴 판단. 지어내지 않았다) ─────────────────────────
 decisions:
   - title: 전투 처리 — 직접 호출 vs 이벤트 큐
     options:
@@ -399,25 +655,26 @@ decisions:
         title: 중앙 처리 이벤트 큐
         chosen: true
     criteria:
-      - label: 결합도·확장성
+      - label: 결합도 · 확장성
         values:
-          - 공격자가 대상을 직접 호출, 스킬마다 처리 지점 분산
-          - AddInGameEvent만 알면 됨, 신규 스킬 추가해도 무변경
+          - 공격자가 대상을 직접 호출 · 스킬 추가마다 처리 지점 분산
+          - AddInGameEvent만 알면 됨 · 신규 스킬 추가해도 무변경
       - label: 처리 타이밍
         values:
           - 같은 프레임 즉시 반영
           - 최대 1프레임 지연
       - label: 반환값 활용
         values:
-          - 데미지·오버킬·사망 여부 즉시 리턴
-          - 리턴값 없음 → 역이벤트·콜백 필요
-      - label: 순회·재진입 안전성
+          - 데미지 · 오버킬 · 사망 여부 즉시 리턴
+          - 리턴값 없음 → 역이벤트 · 콜백 필요
+      - label: 순회 · 재진입 안전성
         values:
           - 타격 중 사망 → 컬렉션 변경 유발
           - 때리는 시점 ≠ 죽는 시점으로 분리
     reason: >-
-      직접 호출은 '타격 도중 적 사망 → 풀 반납·컬렉션 변경'이 중첩돼 오류 위험이 큽니다. 이벤트 큐는 이를 구조적으로 차단하면서 느슨한 결합과 확장을 얻습니다. 타이밍 지연은
-      미미하고 반환값은 콜백으로 보완 가능하다 판단해 B를 선택했습니다.
+      직접 호출은 '타격 도중 적 사망 → 풀 반납 · 컬렉션 변경'이 중첩돼 오류 위험이 큽니다. 이벤트 큐는 이를
+      구조적으로 차단하면서 느슨한 결합과 확장을 얻습니다. 처리 타이밍 지연은 미미하고 반환값은 콜백으로 보완
+      가능하다 판단해 B를 선택했습니다.
   - title: 충돌 판정 — OnTriggerEnter2D vs Raycast & OverlapCircle
     options:
       - key: A
@@ -430,7 +687,7 @@ decisions:
         values:
           - 빠른 투사체가 콜라이더 통과 시 놓침
           - Raycast로 이동 궤적 검사 → 놓치지 않음
-      - label: 대량 처리·물리 부하
+      - label: 대량 처리 · 물리 부하
         values:
           - 한쪽에 Rigidbody2D 필수 → 수백 개면 부하
           - 바디 불필요 + 사전 할당 버퍼로 매 프레임 GC 0
@@ -440,46 +697,54 @@ decisions:
           - OverlapCircle은 원으로 근사
       - label: 구현 비용
         values:
-          - 콜백만 구현, 충돌 드물면 저렴
-          - 버퍼·필터·중복 판정 직접 관리, 매 프레임 쿼리
-    reason: 정밀한 히트박스가 중요하지 않고 대량 충돌이 많이 일어나는 뱀서라이크 장르 특성상, 원형 판정밖에 못 해도 Rigidbody 없이 수백 개를 처리 가능한 B가 유리하다고 판단했습니다.
+          - 콜백만 구현 · 충돌 드물면 저렴
+          - 버퍼 · 필터 · 중복 판정 직접 관리 · 매 프레임 쿼리
+    reason: >-
+      정밀한 히트박스가 중요하지 않고 대량 충돌이 잦은 뱀서라이크 장르 특성상, 원형 판정밖에 못 해도 Rigidbody
+      없이 수백 개를 처리 가능한 B가 유리하다고 판단했습니다.
+
+# ── ⑤ 결과 · 회고 (② 사람이 쓴 판단) ──────────────────────────────────────
 retrospective:
+  # 만족·깨달음·개선의 가로↔세로는 렌더러가 본문 길이로 자동 결정한다(src/lib/cardLayout.ts).
   results:
     - 프레임당 GC 할당 **196회 → 4회 (97%↓)**
-    - 코루틴 300개 → 0개, Destroy 호출 501회 → 0회
-    - Materials **824개 → 249개 (70%↓)**, 메모리 **140MB** 절감
-    - 전체 프레임 타임은 0.05ms 차이로 동일 — 목적이 평균 FPS가 아니라 스파이크 제거였기 때문
-  # 아래 깨달음·개선은 VamSirLike/Assets/Docs/26_0717_VamSirLike_TechDoc.md 에서 가져왔다.
-  # 커밋 819a6ca 기준으로 사용자가 직접 코드를 읽고 적은 것이다. 지어낸 문장이 없다.
+    - Materials **824개 → 249개 (70%↓)**
+    - 메모리 **140MB** 절감
+  satisfaction:
+    - title: 예상을 뛰어넘은 GC 감소
+      body: >-
+        예상보다 훨씬 많은 양의 GC가 감소했다. 작은 프로젝트도 이 정도로 줄었으니, 프로젝트 규모가 커지면
+        그 효과도 더 커질 것으로 기대된다.
+  # 내용이 길어 3열 카드에서 눌린다 → cells(3칸)로 채워 전폭 세로 LessonCard 로 렌더.
+  # 디자인의 원형 그대로다(원본: `① 평균이 아니라 스파이크를…` tint · `② 텍스처 압축…`).
   learnings:
-    - title: 픽셀아트 압축 손상
-      body: >-
-        에디터에서 선명하던 픽셀아트가 Android 빌드 후 색이 뭉개졌다. 압축 포맷이 인접 픽셀을 블록으로 묶어
-        색 차이가 큰 픽셀아트는 정보가 훼손된다. ==RGBA 32bit 무압축==으로 해결 — 픽셀아트는 해상도가 낮아
-        메모리 영향이 미미하다. 텍스처 압축은 안드로이드라고 무조건이 아니라 그래픽 스타일에 따른 트레이드오프다.
-    - title: GC 97% 감소인데 평균 프레임은 그대로
-      body: >-
-        Boehm GC는 임계치 도달 시에만 작동해 **스파이크로만** 나타나고 평균엔 거의 안 드러난다.
-        `Profile Analyzer Compare`로 평균이 아닌 프레임 분포·스파이크를 비교했다 — GC 최적화의 목적은
-        평균 FPS가 아니라 스파이크 제거다.
-    - title: 죽어 있는 StatLevelUp 기능
-      body: StatLevelUp(5001~) 데이터는 TSV에서 임포트되지만 DataManager가 딕셔너리로 만들지 않고 조회 API도 없다. 기능이 데이터만 있고 통째로 죽어 있다.
-    - title: 하드코딩된 스킬 아이콘 주소
-      body: 스킬 아이콘 주소가 SkillSelectButton의 switch 문에 하드코딩돼 있다. 스킬을 추가하려면 TSV뿐 아니라 이 코드도 고쳐야 한다.
-    - title: 복제된 쿨타임 상수
-      body: 쿨타임 감소량 0.5f가 SkillBase.LevelUp과 SkillSelectButton 두 곳에 복제돼 있다. 한쪽만 바꾸면 UI 표시와 실제 동작이 어긋난다. 하한(0.1초)도 표시 쪽에는 빠져 있다.
-    - title: 미해제 이벤트 구독
-      body: UIManager가 OnDestroy에서 ExpManager 이벤트는 해제하지만 PlayerController의 OnHpChanged·OnDeath 구독은 해제하지 않는다.
-    - title: 죽어 있는 적 타입 분기
-      body: EnemyStat.attackType(Melee·Ranged·Boss)이 데이터에 있으나 EnemyController가 분기에 쓰지 않아 현재 모든 적이 근접 행동만 한다. JobType.Mage도 같은 이유로 진입 경로가 없다.
+    - title: 평균이 아니라 스파이크를 제거하는 것
+      tint: true
+      cells:
+        - label: 의문점
+          body: 그래픽 병목을 잡았을 때와 달리 평균 프레임이 유의미하게 늘지 않았다.
+        - label: 원인 · Boehm GC
+          body: 힙에 가비지를 쌓다 임계치에서 수거하며, 그때 게임 로직이 멈춘다(스파이크).
+        - label: 알게 된 점
+          body: 목적은 평균 FPS가 아니라 GC 호출을 줄여 ==스파이크를 없애는 것==. 가비지가 많을수록 더 자주 · 오래 멈춘다.
+    - title: 텍스처 압축도 트레이드오프의 대상
+      cells:
+        - label: 원인
+          body: 압축 포맷은 인접 픽셀 색을 블록 단위로 묶어, 인접 픽셀 간 색 차이가 극명한 픽셀아트는 색상 정보가 훼손된다.
+        - label: 해결
+          body: '==RGBA 32bit 무압축==으로 적용. 픽셀아트는 해상도가 낮아 메모리 영향이 미미하다.'
+        - label: 배운 점
+          body: 안드로이드라고 무조건 압축이 아니라, 그래픽 스타일에 따라 압축도 선택의 문제다.
+  # 개선 계획 — ②가 아직 테스트 문구라, 기존 문서(VamSirLike/Assets/Docs/26_0717_VamSirLike_TechDoc.md)의
+  # 실제 개선 5건을 이어왔다. ①의 '→ 양식 ②' 개선 후보와 일치한다. ②를 채우면 그걸로 교체.
   improvements:
     - title: 스킬 아이콘 주소 데이터화
       body: 스킬 아이콘 주소를 switch에서 SkillData(TSV)로 옮겨, 스킬 추가 시 코드를 건드리지 않게 한다.
     - title: 쿨타임 단일 소스화
-      body: 쿨타임 감소량을 SkillData로 옮겨 표시와 실제가 한 소스를 보게 한다.
+      body: 쿨타임 감소량(0.5f)을 SkillData로 옮겨 표시와 실제가 한 소스를 보게 한다.
     - title: StatLevelUp 살리기 또는 제거
       body: StatLevelUp에 조회 API를 붙여 기능을 살리거나, 살릴 계획이 없다면 데이터와 열거형을 걷어낸다.
     - title: 구독 해제 보완
-      body: UIManager.OnDestroy에서 PlayerController 구독도 해제한다.
+      body: UIManager.OnDestroy에서 PlayerController의 OnHpChanged·OnDeath 구독도 해제한다.
     - title: 직업 선택 경로 개방
       body: GameInitializer.PlayerWarriorId 하드코딩을 걷어내고 GetSkillList()의 Warrior 고정 필터를 파라미터화해 직업 선택 경로를 연다.

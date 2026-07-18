@@ -11,24 +11,25 @@
 - **위치**: `hero`(개요 대표 화면, **1장 필수**) · `기능: {기능 제목}`(본문 이미지) · `회고`
 - **캡션**: 무엇을 보라는 건지. 없으면 장식이다. (비우면 AI 가 이미지 보고 초안)
 
-| 파일명 | 위치       | 캡션(무엇을 보라는 건지)                        |
-|---|----------|---------------------------------------|
-| «gameplay.png» | hero     | «3인칭 전투 — 락온 · HP · 스태미나 바 · 2페이즈 보스» |
-| «profiler-compare» | «최적화»    | «두 최적화 비교»                            |
-| «tex-compressed-result» | «트러블 슈팅» | «텍스처 문제 이전»                           |
-| «tex-uncompressed-result» | «트러블 슈팅» | «텍스처 문제 수정후»                          |
-| «tex-uncompressed-result» | «트러블 슈팅» | «텍스처 문제 수정후»                          |
-| «tex-uncompressed-result» | «트러블 슈팅» | «텍스처 문제 수정후»                          |
+| 파일명 | 위치        | 캡션(무엇을 보라는 건지)                        |
+|---|-----------|---------------------------------------|
+| «gameplay.png» | hero      | «3인칭 전투 — 락온 · HP · 스태미나 바 · 2페이즈 보스» |
+| «profiler-compare» | «최적화»     | «두 최적화 비교»                            |
+| «tex-compressed-result» | «트러블 슈팅»  | «텍스처 문제 이전»                           |
+| «tex-uncompressed-result» | «트러블 슈팅»  | «텍스처 문제 수정후»                          |
+| «shadergraph-flash» | «셰이더 그래프» | «그래프 구조»                              |
+| «ImportTool» | «TSV 임포트» | «구현한 툴»                               |
+| «data-importer» | «TSV 임포트» | «파싱 코드»                               |
 
 ## 링크 (있으면)
-- 유튜브: «url»
-- 깃허브: «url»
+- 유튜브: «https://youtu.be/kCM6ASBUIEo?si=DwkuPkrvpGpf28Gb»
+- 깃허브: «https://github.com/juno11234/VamSirLike.git»
 > 없으면 비운다. 확인 안 된 주소를 지어내지 않는다.
 
 ## 확인만 필요한 메타 (AI 가 코드로 못 얻는 것)
-- **team**(인원): «1인 / 4인 팀»
-- **vcs**(형상관리): «Github Desktop / SourceTree …»
-- **ide**: «Rider 2025.1.4»
+- **team**(인원): «1인»
+- **vcs**(형상관리): «Github Desktop»
+- **ide**: «Rider 2025.2.1»
 > 기간 · 엔진 버전은 AI 가 `git log` · `ProjectSettings/ProjectVersion.txt` 에서 뽑는다 — 맞는지 **확인만**.
 
 ---

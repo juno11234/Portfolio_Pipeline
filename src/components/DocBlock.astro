@@ -14,6 +14,7 @@
  */
 import { renderMermaid } from '../lib/mermaid';
 import { rich } from '../lib/rich';
+import { cardsAreLong } from '../lib/cardLayout';
 
 import Code from './dc/Code.astro';
 import StackTable from './dc/StackTable.astro';
@@ -23,12 +24,14 @@ import ChannelTable from './dc/ChannelTable.astro';
 import MetricsTable from './dc/MetricsTable.astro';
 import Layers from './dc/Layers.astro';
 import PrincipleCards from './dc/PrincipleCards.astro';
+import StackCards from './dc/StackCards.astro';
 import CheckCards from './dc/CheckCards.astro';
 import MiniCards from './dc/MiniCards.astro';
 import FlowCards from './dc/FlowCards.astro';
 import DefectList from './dc/DefectList.astro';
 import Figure from './dc/Figure.astro';
 import FigureAside from './dc/FigureAside.astro';
+import FigureGrid from './dc/FigureGrid.astro';
 import ApiList from './dc/ApiList.astro';
 import Callout from './dc/Callout.astro';
 import StateChips from './dc/StateChips.astro';
@@ -83,9 +86,15 @@ const cardItems = b.type === 'points' ? b.items : [];
 {b.type === 'points' && b.variant === 'defect' && (
   <DefectList margin="16px 0 4px" defects={cardItems.map((it: any, i: number) => ({ code: it.tag ?? `B${i + 1}`, title: it.title, body: it.body }))} />
 )}
-{/* plain(기본) — 잉크 제목 카드. 번호 없는 PrincipleCards 로 낸다. */}
+{/* stack — 자동 판정을 덮어쓰는 강제 세로 override. */}
+{b.type === 'points' && b.variant === 'stack' && (
+  <StackCards margin="16px 0 4px" cards={cardItems.map((it: any) => ({ title: it.title, body: it.body }))} />
+)}
+{/* plain(기본) — 렌더러가 본문 길이로 정한다: 짧으면 3열 격자(가로), 길면 전폭 세로(StackCards). */}
 {b.type === 'points' && (b.variant === undefined || b.variant === 'plain') && (
-  <PrincipleCards margin="16px 0 4px" cards={cardItems.map((it: any) => ({ title: it.title, body: it.body }))} />
+  cardsAreLong(cardItems)
+    ? <StackCards margin="16px 0 4px" cards={cardItems.map((it: any) => ({ title: it.title, body: it.body }))} />
+    : <PrincipleCards margin="16px 0 4px" cards={cardItems.map((it: any) => ({ title: it.title, body: it.body }))} />
 )}
 
 {b.type === 'stack-table' && (
@@ -145,6 +154,19 @@ const cardItems = b.type === 'points' ? b.items : [];
 )}
 {b.type === 'image' && (b.variant === undefined || b.variant === 'below') && (
   <Figure src={b.src.src} alt={b.caption} kind="body" background="#fff" label={b.label} caption={b.caption} margin="18px 0 6px" />
+)}
+
+{b.type === 'figure-grid' && (
+  <div class="scroll"><FigureGrid
+    margin="16px 0 6px"
+    cells={b.cells.map((c: any) => ({
+      src: c.src.src,
+      alt: c.caption,
+      background: c.background,
+      explicit: (c.width !== undefined && c.height !== undefined) ? { width: c.width, height: c.height } : undefined,
+      caption: c.caption,
+    }))}
+  /></div>
 )}
 
 {b.type === 'mermaid' && mermaidSvg !== null && (

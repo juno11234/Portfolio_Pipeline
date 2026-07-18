@@ -13,6 +13,7 @@ import { getCollection, getEntry } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import type { TocItem } from '../../layouts/Base.astro';
 import { rich } from '../../lib/rich';
+import { cardsAreLong } from '../../lib/cardLayout';
 
 import SectionHead from '../../components/dc/SectionHead.astro';
 import ChapterDivider from '../../components/dc/ChapterDivider.astro';
@@ -27,6 +28,8 @@ import Tldr from '../../components/dc/Tldr.astro';
 import Decision from '../../components/dc/Decision.astro';
 import StackTable from '../../components/dc/StackTable.astro';
 import PrincipleCards from '../../components/dc/PrincipleCards.astro';
+import LessonCard from '../../components/dc/LessonCard.astro';
+import StackCards from '../../components/dc/StackCards.astro';
 import DocBlock from '../../components/DocBlock.astro';
 
 /** 기술 문서가 있는 프로젝트만 페이지를 만든다. 아직 문서 없는 프로젝트는 자동으로 빠진다. */
@@ -170,13 +173,31 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
       {d.retrospective.satisfaction !== undefined && (
         <>
           <PartTitle badge="만족" title="만족스러운 부분" margin="36px 0 6px" />
-          <PrincipleCards margin="16px 0 4px" cards={d.retrospective.satisfaction} />
+          {/* 짧으면 3열 격자, 길면 전폭 세로 — 렌더러가 본문 길이로 정한다. */}
+          {cardsAreLong(d.retrospective.satisfaction) ? (
+            <StackCards margin="16px 0 4px" cards={d.retrospective.satisfaction.map((c) => ({ title: c.title, body: c.body ?? '' }))} />
+          ) : (
+            <PrincipleCards margin="16px 0 4px" cards={d.retrospective.satisfaction.map((c) => ({ title: c.title, body: c.body ?? '' }))} />
+          )}
         </>
       )}
       <PartTitle badge="깨달음" title="아쉬웠던 점 · 깨달은 점" margin="40px 0 6px" />
-      <PrincipleCards margin="16px 0 4px" cards={d.retrospective.learnings} />
+      {/* cells 를 채운 깨달음은 디자인 원형인 전폭 세로 LessonCard. 아니면 본문 길이로 격자↔세로. */}
+      {d.retrospective.learnings.every((l) => l.cells !== undefined) ? (
+        d.retrospective.learnings.map((l) => (
+          <LessonCard title={l.title} kind={l.tint === true ? 'tint' : 'plain'} cells={l.cells ?? []} margin="14px 0" />
+        ))
+      ) : cardsAreLong(d.retrospective.learnings) ? (
+        <StackCards margin="16px 0 4px" cards={d.retrospective.learnings.map((l) => ({ title: l.title, body: l.body ?? '' }))} />
+      ) : (
+        <PrincipleCards margin="16px 0 4px" cards={d.retrospective.learnings.map((l) => ({ title: l.title, body: l.body ?? '' }))} />
+      )}
       <PartTitle badge="개선" title="다음 계획" margin="40px 0 6px" />
-      <PrincipleCards margin="16px 0 4px" cards={d.retrospective.improvements} />
+      {cardsAreLong(d.retrospective.improvements) ? (
+        <StackCards margin="16px 0 4px" cards={d.retrospective.improvements.map((c) => ({ title: c.title, body: c.body ?? '' }))} />
+      ) : (
+        <PrincipleCards margin="16px 0 4px" cards={d.retrospective.improvements.map((c) => ({ title: c.title, body: c.body ?? '' }))} />
+      )}
     </SectionHead>
 
     <DocFooter thanks="감사합니다" thanksSub="THANK YOU" byline={byline} />

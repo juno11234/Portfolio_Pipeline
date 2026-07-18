@@ -111,8 +111,27 @@ const projects = defineCollection({
 /** 문단 묶음. 빈 문단이나 빈 배열을 막는다. */
 const paragraphs = z.array(z.string().min(1)).min(1);
 
-/** 회고 카드 한 장 — 작은 제목 + 내용. 만족·깨달음·개선 세 묶음이 공유한다. */
-const retroCard = z.object({ title: z.string().min(1), body: z.string().min(1) });
+/**
+ * 회고 카드 한 장. 만족·깨달음·개선 세 묶음이 공유한다.
+ *
+ * 기본은 작은 제목 + 내용(body) 카드다. **내용이 길어 3열 카드(PrincipleCards)에서 눌리는
+ * 깨달음**은 `cells`(의문점·원인·알게된 점 3칸)를 채우면 디자인의 원래 형태인 **전폭 세로
+ * LessonCard**로 렌더된다(원본 대조: `① 평균이 아니라 스파이크를…` · `② 텍스처 압축…`).
+ * body 든 cells 든 하나는 있어야 한다. cells 를 안 쓰는 기존 문서는 그대로 body 카드로 남는다(additive).
+ */
+const retroCard = z
+  .object({
+    title: z.string().min(1),
+    /** 단순 카드 본문. cells 를 쓰면 생략한다. */
+    body: z.string().min(1).optional(),
+    /** LessonCard 3칸(의문점·원인·알게된 점 등). 있으면 전폭 세로 LessonCard 로 낸다. */
+    cells: z.array(z.object({ label: z.string().min(1), body: z.string().min(1) })).min(2).optional(),
+    /** LessonCard tint(파란 배경) — 이 문서의 핵심 깨달음 하나에만. */
+    tint: z.boolean().default(false),
+  })
+  .refine((c) => c.body !== undefined || (c.cells !== undefined && c.cells.length > 0), {
+    message: 'retroCard 는 body(단순 카드) 또는 cells(LessonCard) 중 하나가 반드시 있어야 합니다.',
+  });
 
 /* ============================================================================
  * 기술 문서 블록
@@ -161,14 +180,15 @@ const codeBlock = z.object({
 const pointsBlock = z.object({
   type: z.literal('points'),
   /**
-   *   plain    — 흰 카드 (기본)
+   *   plain    — 흰 카드 3열 (기본)
    *   numbered — 큰 파란 번호 (설계 원칙 · 만족스러운 부분)
    *   check    — 동그란 ✓ (적용 목록)
    *   mini     — 작은 가운데정렬 (자료구조 3종)
    *   flow     — 화살표로 이은 가로 흐름 (에이전트 단계)
    *   defect   — 코드 배지 세로 목록 (리뷰 결함 · 아쉬웠던 점)
+   *   stack    — plain 과 같은 카드를 **전폭 1열 세로**로 (내용이 길어 3열에서 눌릴 때). StackCards.
    */
-  variant: z.enum(['plain', 'numbered', 'check', 'mini', 'flow', 'defect']).default('plain'),
+  variant: z.enum(['plain', 'numbered', 'check', 'mini', 'flow', 'defect', 'stack']).default('plain'),
   /** 몇 열로 세울지. 원본이 2·3열을 쓴다. */
   columns: z.union([z.literal(2), z.literal(3)]).default(3),
   items: z.array(z.object({
@@ -465,6 +485,28 @@ function makeDocBlock(image: ImageFn) {
     width: z.number().int().positive().optional(),
   });
 
+  /**
+   * 그림 2장 나란히(FigureGrid). 전후 비교·카탈로그를 가로로 한눈에 본다.
+   * 단일 image 블록을 세로로 쌓으면 작은 원본이 본문 폭까지 늘어나 깨진다 — 2열로 두면 폭이 절반이라 덜 늘어난다.
+   * width·height 를 주면 픽셀 고정(원본이 아주 작을 때 과확대 방지), 없으면 칸 폭 100%.
+   */
+  const figureGridBlock = z.object({
+    type: z.literal('figure-grid'),
+    cells: z
+      .array(
+        z.object({
+          src: image(),
+          caption: z.string().min(1),
+          /** 그림 뒤 배경. 예: #fff · #0f0f10 */
+          background: z.string().min(1).default('#fff'),
+          /** 픽셀 고정 크기(원본이 작아 늘리면 깨질 때). 둘 다 있어야 적용, 없으면 폭 100%. */
+          width: z.number().int().positive().optional(),
+          height: z.number().int().positive().optional(),
+        }),
+      )
+      .length(2),
+  });
+
   return z.discriminatedUnion('type', [
     proseBlock,
     codeBlock,
@@ -475,6 +517,7 @@ function makeDocBlock(image: ImageFn) {
     metricsBlock,
     beforeAfterBlock,
     imageBlock,
+    figureGridBlock,
     mermaidBlock,
     apiListBlock,
     calloutBlock,
@@ -672,6 +715,8 @@ const projectDocs = defineCollection({
      * 가이드: "'아쉬운 점 없습니다'는 0점. 부채를 인지하고 개선을 제시하는 사람이 성장 가능성을 인정받는다."
      */
     retrospective: z.object({
+      // 만족·깨달음·개선 카드의 가로(격자)↔세로(스택)는 렌더러가 본문 길이로 자동 결정한다(src/lib/cardLayout.ts).
+      // 콘텐츠 파일은 레이아웃 플래그를 들지 않는다 — 여백 규칙과 같은 원칙.
       /** 결과 — 목표 달성을 수치로. 없는 문서는 생략 가능. */
       results: z.array(z.string().min(1)).min(1).optional(),
       /** 만족스러운 부분 — 무엇을 잘했나. 카드. 선택. */
