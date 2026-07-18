@@ -25,11 +25,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22 # Astro 7 은 Node >=22.12 필요 (로컬도 v24)
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # npm ci 가 아니라 npm install: package-lock 이 Windows 에서 생성돼 Linux 전용
+        # optional 의존성(@emnapi 등 wasm 런타임)의 배치가 어긋난다. npm ci 는 이를 거부하지만
+        # npm install 은 현재 플랫폼에 맞게 lock 을 재조정해 설치한다.
+        run: npm install
 
       # Mermaid를 빌드 시점에 SVG로 굽는 데 chromium이 필요하다 (mermaid-isomorphic + playwright).
       # 없으면 mermaid 블록에서 빌드가 예외로 멈춘다.
