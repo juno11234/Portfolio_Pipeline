@@ -660,9 +660,25 @@ features:
           - type: points
             variant: defect
             items:
-              - { tag: BUG-05, title: MapView.Initialize() 중복 호출 시 오브젝트 누적, body: '**발견** 맵 복귀 시마다 기존 노드 뷰 · 엣지 뷰가 파괴되지 않고 다시 생성. **영향** 오브젝트 누수 → 성능 저하 · 잘못된 클릭 이벤트. **조치** ==재초기화 가드== 추가 — 반복 플레이가 필요한 재현 조건을 리뷰가 대신함.' }
-              - { tag: BUG-06, title: WeightedRandom 배열 불일치 — 예외 발생, body: '**발견** types 배열은 4개 고정인데 GetWeights()는 상황에 따라 5개 반환. **영향** IndexOutOfRangeException → 맵 생성 실패. **조치** 두 배열을 ==WeightTypeOrder 단일 배열==로 통합 — 두 메서드에 동시 반영.' }
-              - { tag: ARCH-02, title: StageLoader 이중 로드 방지 누락, body: '**발견** LoadStage() 실행 중 재호출되면 _hasLoadedScene이 아직 false. **영향** 빠른 연속 클릭 시 같은 씬이 Additive로 중복 로드 가능. **조치** ==_isLoading 플래그== 추가 — 컷씬 로더에도 동일 패턴 적용.' }
+              # 발견/영향/조치를 한 줄씩(|- 블록 + rich 의 개행→<br>).
+              - tag: BUG-05
+                title: MapView.Initialize() 중복 호출 시 오브젝트 누적
+                body: |-
+                  **발견** 맵 복귀 시마다 기존 노드 뷰 · 엣지 뷰가 파괴되지 않고 다시 생성
+                  **영향** 오브젝트 누수 → 성능 저하 · 잘못된 클릭 이벤트
+                  **조치** ==재초기화 가드== 추가 — 반복 플레이가 필요한 재현 조건을 리뷰가 대신함
+              - tag: BUG-06
+                title: WeightedRandom 배열 불일치 — 예외 발생
+                body: |-
+                  **발견** types 배열은 4개 고정인데 GetWeights()는 상황에 따라 5개 반환
+                  **영향** IndexOutOfRangeException → 맵 생성 실패
+                  **조치** 두 배열을 ==WeightTypeOrder 단일 배열==로 통합 — 두 메서드에 동시 반영
+              - tag: ARCH-02
+                title: StageLoader 이중 로드 방지 누락
+                body: |-
+                  **발견** LoadStage() 실행 중 재호출되면 _hasLoadedScene이 아직 false
+                  **영향** 빠른 연속 클릭 시 같은 씬이 Additive로 중복 로드 가능
+                  **조치** ==_isLoading 플래그== 추가 — 컷씬 로더에도 동일 패턴 적용
 
 # ── ④ 고민과 선택 (② 사람이 쓴 판단) ─────────────────────────────────────
 decisions:

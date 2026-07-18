@@ -42,6 +42,11 @@ export function escapeHtml(text: string): string {
  * 그 다음 볼드류를 열고, 코드는 맨 뒤에 연다 — 코드 안 텍스트에는 볼드를 열지 않기 위해서다.
  * `**` 를 `==`·`!!` 보다 먼저 처리해 별표가 다른 기호와 얽히지 않게 한다.
  *
+ * **개행은 `<br>` 로 연다(맨 마지막).** `|-` 블록 스칼라로 여러 줄을 쓰면 그대로 줄바꿈된다
+ * (예: 결함 카드의 발견/영향/조치를 한 줄씩). `>-` 는 개행을 공백으로 접으므로 이 규칙에 안 걸린다 —
+ * 기존 콘텐츠는 전부 `>-`·한 줄이라 영향이 없다(하위호환). 줄바꿈은 '구조'(표·목록·제목)가 아니라 여백이라
+ * "문장은 강조만" 원칙을 깨지 않는다.
+ *
  * @param text 콘텐츠 파일의 원문
  */
 export function rich(text: string): string {
@@ -49,5 +54,6 @@ export function rich(text: string): string {
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/==([^=]+)==/g, '<b style="color:#1d4ed8">$1</b>')
     .replace(/!!([^!]+)!!/g, '<b style="color:#b91c1c">$1</b>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>');
 }
