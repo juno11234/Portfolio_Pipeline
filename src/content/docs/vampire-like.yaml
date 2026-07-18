@@ -17,6 +17,30 @@ overview:
     최적화 전 기준 프레임당 GC 할당 **196회**, 코루틴 **300개**, Destroy 호출 **501회**, Materials **824개** (Unity Profiler · Profile Analyzer,
     몬스터 스폰딜레이 0.1초 환경)
   scope: 의존성 주입과 초기화 순서, 데이터 드리븐 파이프라인, 이벤트 큐 전투 시스템, GC 최적화를 다룹니다. 아트·사운드·레벨 디자인은 이 문서의 범위가 아닙니다.
+  stack:
+    title: 데이터 주도 · 무할당을 위한 도구 선택
+    rows:
+      - category: DI 프레임워크
+        tech: VContainer
+        purpose: 전역 의존성 주입 및 객체 생명주기 관리
+      - category: 비동기 처리
+        tech: UniTask
+        purpose: GC 없는 async/await · 프레임 분산 로딩 · 취소 토큰 연동
+      - category: 에셋 관리
+        tech: Addressables
+        purpose: 프리팹·스프라이트·데이터의 비동기 로드 및 명시적 해제
+      - category: 오브젝트 풀링
+        tech: Unity ObjectPool
+        purpose: 적·투사체·경험치의 재사용으로 GC 스파이크 제거
+      - category: 데이터
+        tech: ScriptableObject, TSV
+        purpose: 기획 데이터를 코드와 분리한 데이터 드리븐 설계
+      - category: 셰이더
+        tech: ShaderGraph
+        purpose: Shader Graph로 피격시 플래시 효과
+      - category: material 최적화
+        tech: MaterialPropertyBlock
+        purpose: 피격 플래시 효과 시 프로퍼티만 덮어씌워 공유 material 유지
 screenshot:
   src: ../../assets/vampire-like/gameplay.png
   caption: 인게임 플레이 — 화면을 가득 채운 적, 자동 발동 스킬, 경험치 바(Lv.8)
@@ -34,31 +58,6 @@ links:
 architecture:
   title: 전체 시스템 구조
   parts:
-    - title: 기술 스택
-      blocks:
-        - type: stack-table
-          rows:
-            - category: DI 프레임워크
-              tech: VContainer
-              purpose: 전역 의존성 주입 및 객체 생명주기 관리
-            - category: 비동기 처리
-              tech: UniTask
-              purpose: GC 없는 async/await · 프레임 분산 로딩 · 취소 토큰 연동
-            - category: 에셋 관리
-              tech: Addressables
-              purpose: 프리팹·스프라이트·데이터의 비동기 로드 및 명시적 해제
-            - category: 오브젝트 풀링
-              tech: Unity ObjectPool
-              purpose: 적·투사체·경험치의 재사용으로 GC 스파이크 제거
-            - category: 데이터
-              tech: ScriptableObject, TSV
-              purpose: 기획 데이터를 코드와 분리한 데이터 드리븐 설계
-            - category: 셰이더
-              tech: ShaderGraph
-              purpose: Shader Graph로 피격시 플래시 효과
-            - category: material 최적화
-              tech: MaterialPropertyBlock
-              purpose: 피격 플래시 효과 시 프로퍼티만 덮어씌워 공유 material 유지
     - title: 시스템 구조
       lede: 조립 루트 → 매니저 → 런타임 객체의 3계층
       blocks:
@@ -450,32 +449,37 @@ retrospective:
     - 코루틴 300개 → 0개, Destroy 호출 501회 → 0회
     - Materials **824개 → 249개 (70%↓)**, 메모리 **140MB** 절감
     - 전체 프레임 타임은 0.05ms 차이로 동일 — 목적이 평균 FPS가 아니라 스파이크 제거였기 때문
-  troubleshooting:
-    - problem: 에디터에서 선명하던 픽셀아트 스프라이트가 Android 빌드 후 색이 뭉개졌다
-      cause: 압축 포맷은 인접 픽셀 색을 블록 단위로 묶는다. 픽셀아트처럼 인접 픽셀 간 색 차이가 극명한 텍스처는 이 과정에서 색상 정보가 훼손된다
-      fix: RGBA 32bit 무압축을 적용했다. 텍스처 메모리는 늘지만 픽셀아트는 해상도 자체가 낮아 메모리 영향이 미미하다
-      lesson: 텍스처 압축은 안드로이드라고 무조건 적용하는 것이 아니라 그래픽 스타일에 따라 트레이드 오프의 대상이 된다
-    - problem: GC를 97% 줄였는데 평균 프레임이 유의미하게 늘지 않았다
-      cause: Boehm GC는 관리 힙에 가비지를 쌓아놓고 임계치에 도달할 때 작동한다. 이때만 게임 로직이 멈추므로(스파이크) 평균값에는 거의 드러나지 않는다
-      fix: Profile Analyzer의 Compare 모드로 평균이 아닌 프레임 분포와 스파이크를 비교했다
-      lesson: GC 최적화의 목적은 평균 FPS가 아니라 스파이크 제거다. 가비지가 많을수록 GC가 더 자주, 더 오래 멈춘다
-  # 부채·계획은 VamSirLike/Assets/Docs/26_0717_VamSirLike_TechDoc.md 에서 가져왔다.
+  # 아래 깨달음·개선은 VamSirLike/Assets/Docs/26_0717_VamSirLike_TechDoc.md 에서 가져왔다.
   # 커밋 819a6ca 기준으로 사용자가 직접 코드를 읽고 적은 것이다. 지어낸 문장이 없다.
-  debt:
-    - >-
-      StatLevelUp(5001~) 데이터는 TSV에서 임포트되지만 DataManager가 딕셔너리로 만들지 않고 조회 API도 없다. 스탯 레벨업 기능이 데이터만 있고 통째로 죽어
-      있다.
-    - 스킬 아이콘 주소가 SkillSelectButton의 switch 문에 하드코딩돼 있다. 스킬을 추가하려면 TSV뿐 아니라 이 코드도 고쳐야 한다.
-    - >-
-      쿨타임 감소량 0.5f가 SkillBase.LevelUp과 SkillSelectButton 두 곳에 복제돼 있다. 한쪽만 바꾸면 UI 표시와 실제 동작이 어긋난다. 하한(0.1초)도
-      표시 쪽에는 빠져 있다.
-    - UIManager가 OnDestroy에서 ExpManager 이벤트는 해제하지만 PlayerController의 OnHpChanged·OnDeath 구독은 해제하지 않는다.
-    - >-
-      EnemyStat.attackType(Melee·Ranged·Boss)이 데이터에 있으나 EnemyController가 분기에 쓰지 않아 현재 모든 적이 근접 행동만 한다.
-      JobType.Mage도 같은 이유로 진입 경로가 없다.
-  plan:
-    - 스킬 아이콘 주소를 switch에서 SkillData(TSV)로 옮겨, 스킬 추가 시 코드를 건드리지 않게 한다.
-    - 쿨타임 감소량을 SkillData로 옮겨 표시와 실제가 한 소스를 보게 한다.
-    - StatLevelUp에 조회 API를 붙여 기능을 살리거나, 살릴 계획이 없다면 데이터와 열거형을 걷어낸다.
-    - UIManager.OnDestroy에서 PlayerController 구독도 해제한다.
-    - GameInitializer.PlayerWarriorId 하드코딩을 걷어내고 GetSkillList()의 Warrior 고정 필터를 파라미터화해 직업 선택 경로를 연다.
+  learnings:
+    - title: 픽셀아트 압축 손상
+      body: >-
+        에디터에서 선명하던 픽셀아트가 Android 빌드 후 색이 뭉개졌다. 압축 포맷이 인접 픽셀을 블록으로 묶어
+        색 차이가 큰 픽셀아트는 정보가 훼손된다. ==RGBA 32bit 무압축==으로 해결 — 픽셀아트는 해상도가 낮아
+        메모리 영향이 미미하다. 텍스처 압축은 안드로이드라고 무조건이 아니라 그래픽 스타일에 따른 트레이드오프다.
+    - title: GC 97% 감소인데 평균 프레임은 그대로
+      body: >-
+        Boehm GC는 임계치 도달 시에만 작동해 **스파이크로만** 나타나고 평균엔 거의 안 드러난다.
+        `Profile Analyzer Compare`로 평균이 아닌 프레임 분포·스파이크를 비교했다 — GC 최적화의 목적은
+        평균 FPS가 아니라 스파이크 제거다.
+    - title: 죽어 있는 StatLevelUp 기능
+      body: StatLevelUp(5001~) 데이터는 TSV에서 임포트되지만 DataManager가 딕셔너리로 만들지 않고 조회 API도 없다. 기능이 데이터만 있고 통째로 죽어 있다.
+    - title: 하드코딩된 스킬 아이콘 주소
+      body: 스킬 아이콘 주소가 SkillSelectButton의 switch 문에 하드코딩돼 있다. 스킬을 추가하려면 TSV뿐 아니라 이 코드도 고쳐야 한다.
+    - title: 복제된 쿨타임 상수
+      body: 쿨타임 감소량 0.5f가 SkillBase.LevelUp과 SkillSelectButton 두 곳에 복제돼 있다. 한쪽만 바꾸면 UI 표시와 실제 동작이 어긋난다. 하한(0.1초)도 표시 쪽에는 빠져 있다.
+    - title: 미해제 이벤트 구독
+      body: UIManager가 OnDestroy에서 ExpManager 이벤트는 해제하지만 PlayerController의 OnHpChanged·OnDeath 구독은 해제하지 않는다.
+    - title: 죽어 있는 적 타입 분기
+      body: EnemyStat.attackType(Melee·Ranged·Boss)이 데이터에 있으나 EnemyController가 분기에 쓰지 않아 현재 모든 적이 근접 행동만 한다. JobType.Mage도 같은 이유로 진입 경로가 없다.
+  improvements:
+    - title: 스킬 아이콘 주소 데이터화
+      body: 스킬 아이콘 주소를 switch에서 SkillData(TSV)로 옮겨, 스킬 추가 시 코드를 건드리지 않게 한다.
+    - title: 쿨타임 단일 소스화
+      body: 쿨타임 감소량을 SkillData로 옮겨 표시와 실제가 한 소스를 보게 한다.
+    - title: StatLevelUp 살리기 또는 제거
+      body: StatLevelUp에 조회 API를 붙여 기능을 살리거나, 살릴 계획이 없다면 데이터와 열거형을 걷어낸다.
+    - title: 구독 해제 보완
+      body: UIManager.OnDestroy에서 PlayerController 구독도 해제한다.
+    - title: 직업 선택 경로 개방
+      body: GameInitializer.PlayerWarriorId 하드코딩을 걷어내고 GetSkillList()의 Warrior 고정 필터를 파라미터화해 직업 선택 경로를 연다.

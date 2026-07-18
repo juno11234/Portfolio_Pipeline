@@ -19,6 +19,33 @@ overview:
     **DI 3계층 + 목적별 정적 채널**로 씬 경계를 잇고, **단일 시드 결정론 맵 생성**·**다층 턴 루프**·**비파괴 Timeline
     연출**을 인터페이스 기반으로 구현했습니다. AI를 **Plan·Build·Review** 에이전트로 나눠 정적 분석으로 결함 3건을 리뷰 단계에서 제거했습니다.
   scope: DI 스코프 설계, 씬 경계 통신(정적 채널), 절차적 맵 생성, 다층 턴 루프, Timeline 연출, AI 에이전트 개발 프로세스를 다룹니다. 아트·사운드·기획 밸런싱은 이 문서의 범위가 아닙니다.
+  stack:
+    title: 데이터 주도 · 무할당을 위한 도구 선택
+    rows:
+      - category: DI 프레임워크
+        tech: VContainer
+        purpose: 전역 의존성 주입 및 EntryPoint 생명주기 관리
+      - category: 비동기 처리
+        tech: UniTask
+        purpose: GC 없는 async/await · WhenAll 병렬 로딩 · 취소 토큰 연동
+      - category: 에셋 관리
+        tech: Addressables
+        purpose: 프리팹·스프라이트·데이터의 비동기 로드 및 명시적 해제
+      - category: 오브젝트 풀링
+        tech: Unity ObjectPool
+        purpose: 스킬 이펙트 재사용으로 GC 스파이크 제거
+      - category: 데이터
+        tech: ScriptableObject · TSV
+        purpose: 맵·스킬·이벤트 기획 데이터를 코드와 분리한 데이터 주도 설계
+      - category: 연출 시스템
+        tech: Unity Timeline
+        purpose: 카메라 셰이크·실루엣 커스텀 트랙(Playables 4계층) 자체 구현
+      - category: 카메라
+        tech: Cinemachine
+        purpose: Perlin 노이즈 기반 카메라 흔들림 제어
+      - category: 셰이더
+        tech: ShaderLab · HLSL
+        purpose: 텍스처 없는 속도선 · 원본↔단색 보간 실루엣 연출
 screenshot:
   src: ../../assets/bond/bond-gameplay.png
   caption: 파티 vs 몬스터 턴제 전투 — 상단 턴 순서 큐, 하단 선택 유닛 스탯·스킬·장비 패널
@@ -163,21 +190,7 @@ features:
               - { tag: B1, title: TurnManager.SwitchBattle — CTS 잔류, body: '`m_cts = new()` 이후에 null 인자를 검사해, LogError로 빠지면 `m_cts`가 non-null로 남아 다음 `OnBattle`이 전투 종료로 오작동' }
               - { tag: B2, title: CharacterSelectChannel — 단일 정적 TCS, body: '`_tcs`가 정적 단일 슬롯이라 캐릭터 선택 요청이 겹치면 이전 TCS가 유실 → `await`가 영구 대기' }
               - { tag: B3, title: HandleBattleChoice — Pending Report 누수, body: '전투 설정이 없거나 몬스터 풀이 비면 `CancelPendingReport()` 없이 return → 열린 저널 리포트가 다음 이벤트까지 잔류' }
-    decisions:
-      - title: 완료 콜백 채널 — AI 제안을 내가 뒤집다
-        options:
-          - { key: A, title: 단일 슬롯 콜백 (AI 제안) }
-          - { key: B, title: Stack 채널 (역제안), chosen: true }
-        criteria:
-          - label: 콜백 중첩
-            values:
-              - 완료 콜백이 단일 슬롯이라 컷씬 콜백이 전투 콜백을 !!덮어써!! 복귀 실패
-              - 상위 콜백을 유지한 채 컷씬 콜백을 Push/Pop 으로 겹쳐 쌓음
-          - label: 잔류 방어
-            values:
-              - 슬롯이 하나라 상태 추적·정리가 어려움
-              - Register=Push · Invoke=Peek · Unregister=Pop 으로 책임이 명확
-        reason: AI가 제시한 단일 슬롯 설계의 한계를 짚어 **Stack 구조를 역으로 제안**했고, Stage · CutScene 두 Completion 채널 모두 이 구조를 채택했습니다.
+    decisions: []
   - title: 절차적 맵 생성
     intro: 단일 시드 RNG를 전 단계가 공유하는 **결정론적 생성기**입니다. 같은 시드는 항상 같은 맵을 만듭니다.
     parts:
@@ -275,25 +288,7 @@ features:
               - { title: MapConfigLoader, body: Addressables 병렬 로드 · 핸들 소유/해제 }
               - { title: MapConfigPackage, body: 로드 결과를 담은 순수 DTO }
               - { title: MapConfigCache, body: 핸들 해제 후 참조 보관 · IsReady }
-    decisions:
-      - title: 씬 경계 데이터 전달 — 싱글톤 vs 정적 채널
-        options:
-          - { key: A, title: 범용 전역 싱글톤 }
-          - { key: B, title: 목적별 정적 채널, chosen: true }
-        criteria:
-          - label: 계약 범위
-            values:
-              - 한 매니저에 전 씬 데이터 집중 → 결합도 상승
-              - 채널마다 좁은 목적 하나만 — 계약이 명확
-          - label: 잔류 상태
-            values:
-              - 어디서 남는지 추적 어려움
-              - 채널별 `Clear()`로 잔류 방어
-          - label: 콜백 중첩
-            values:
-              - 단일 슬롯이면 덮어쓰기 발생
-              - Stack 채널로 중첩 콜백 지원
-        reason: Addressables·스코프 제약 아래에서 범용 싱글톤은 결합과 잔류 추적 비용이 큽니다. **좁은 계약 + Clear + Stack**을 갖춘 목적별 정적 채널이 씬 경계 통신에 더 안전하다고 판단했습니다.
+    decisions: []
   - title: 전투
     intro: 진입 → 턴 루프 → 스킬 실행 → 종료의 **단방향 흐름**입니다. 연출은 이벤트로 분리되어 전투 로직을 막지 않고, `TurnManager`는 `ITurnUseUnit` 계약에만 의존합니다.
     parts:
@@ -409,36 +404,57 @@ features:
               - { title: 이중 가중치 블렌딩, body: 타임라인 크로스페이드 × 클립 내부 fadeIn/Out을 가중 합성 }
               - { title: 에디터 스크럽 안전, body: 그래프 재빌드로 플래그가 어긋나도 **머티리얼 참조 비교**로 안전 복구 }
     decisions: []
-decisions: []
+decisions:
+  - title: 완료 콜백 채널 — AI 제안을 내가 뒤집다
+    options:
+      - { key: A, title: 단일 슬롯 콜백 (AI 제안) }
+      - { key: B, title: Stack 채널 (역제안), chosen: true }
+    criteria:
+      - label: 콜백 중첩
+        values:
+          - 완료 콜백이 단일 슬롯이라 컷씬 콜백이 전투 콜백을 !!덮어써!! 복귀 실패
+          - 상위 콜백을 유지한 채 컷씬 콜백을 Push/Pop 으로 겹쳐 쌓음
+      - label: 잔류 방어
+        values:
+          - 슬롯이 하나라 상태 추적·정리가 어려움
+          - Register=Push · Invoke=Peek · Unregister=Pop 으로 책임이 명확
+    reason: AI가 제시한 단일 슬롯 설계의 한계를 짚어 **Stack 구조를 역으로 제안**했고, Stage · CutScene 두 Completion 채널 모두 이 구조를 채택했습니다.
+  - title: 씬 경계 데이터 전달 — 싱글톤 vs 정적 채널
+    options:
+      - { key: A, title: 범용 전역 싱글톤 }
+      - { key: B, title: 목적별 정적 채널, chosen: true }
+    criteria:
+      - label: 계약 범위
+        values:
+          - 한 매니저에 전 씬 데이터 집중 → 결합도 상승
+          - 채널마다 좁은 목적 하나만 — 계약이 명확
+      - label: 잔류 상태
+        values:
+          - 어디서 남는지 추적 어려움
+          - 채널별 `Clear()`로 잔류 방어
+      - label: 콜백 중첩
+        values:
+          - 단일 슬롯이면 덮어쓰기 발생
+          - Stack 채널로 중첩 콜백 지원
+    reason: Addressables·스코프 제약 아래에서 범용 싱글톤은 결합과 잔류 추적 비용이 큽니다. **좁은 계약 + Clear + Stack**을 갖춘 목적별 정적 채널이 씬 경계 통신에 더 안전하다고 판단했습니다.
 retrospective:
-  parts:
-    - badge: 잘한 점
-      title: 과거 vs 현재 — 구조가 바뀐 지점
-      blocks:
-        - type: before-after
-          before:
-            label: 과거 팀 프로젝트
-            items:
-              - 클래스 간 결합도가 높아 **실행 순서에 의존**
-              - 싱글톤 남용으로 의존 관계 추적 곤란
-              - Script Execution Order로 순서 강제
-          after:
-            label: 현재 팀 프로젝트
-            items:
-              - '**VContainer**로 씬 생명주기 관리'
-              - 외부 주입으로 초기화 순서 제어
-              - ==인터페이스를 참조==하는 구조
-          lesson: 계기는 자식 Scope에서 부모의 `TurnManager` 접근 시 오작동이었습니다. Lifetime은 **씬 수명이 아니라 요청을 처리하는 컨테이너 구역** 기준임을 실험으로 확인했습니다.
-        - type: points
-          variant: mini
-          columns: 3
-          items:
-            - { title: Singleton, body: 자식에서 접근해도 **부모와 같은 인스턴스** }
-            - { title: Scoped, body: 자식마다 **부모와 다른 인스턴스** }
-            - { title: 재등록, body: Singleton이라도 자식이 새로 등록하면 **다른 인스턴스** }
-  debt:
-    - CI/CD 도입이 늦었다. "게임이 한 바퀴는 돌아야 빌드 테스트가 가능하다"는 판단으로 미뤄, 결국 제일 마지막에 붙여 자동화의 이점을 살리지 못했다.
-    - 버티컬 슬라이스를 과대하게 잡았다. 모든 스테이지 유형(일반·엘리트·이벤트·캠프·보스) 1회 클리어를 기준으로 삼아 진행이 더뎠고, 일반 전투 하나로 좁힌 뒤에야 방향이 구체화됐다.
-  plan:
-    - 코어 루프 완성 직후 **빌드 파이프라인부터** 세운다. 자동화의 이점은 초기에 붙일수록 크다.
-    - 버티컬 슬라이스는 **최소 핵심 코어 루프** 기준으로 자른다. 유형을 다 덮으려 하지 않는다.
+  satisfaction:
+    - title: 과거 vs 현재 — 구조가 바뀐 지점
+      body: >-
+        과거 팀 프로젝트는 **높은 결합도와 싱글톤 남용**으로 실행 순서에 의존했지만, 현재는 **VContainer로 씬
+        생명주기를 관리**하고 ==인터페이스를 참조==하는 구조입니다. Lifetime은 씬 수명이 아니라
+        **요청을 처리하는 컨테이너 구역** 기준임을 실험으로 확인했습니다.
+    - title: DI 인스턴스 수명 이해
+      body: >-
+        Singleton은 자식에서 접근해도 부모와 같은 인스턴스, Scoped는 자식마다 다른 인스턴스, 재등록하면
+        Singleton이라도 다른 인스턴스입니다.
+  learnings:
+    - title: 늦은 CI/CD 도입
+      body: CI/CD 도입이 늦었다. "게임이 한 바퀴는 돌아야 빌드 테스트가 가능하다"는 판단으로 미뤄, 결국 제일 마지막에 붙여 자동화의 이점을 살리지 못했다.
+    - title: 과대한 버티컬 슬라이스
+      body: 모든 스테이지 유형(일반·엘리트·이벤트·캠프·보스) 1회 클리어를 기준으로 삼아 진행이 더뎠고, 일반 전투 하나로 좁힌 뒤에야 방향이 구체화됐다.
+  improvements:
+    - title: 빌드 파이프라인부터
+      body: 코어 루프 완성 직후 **빌드 파이프라인부터** 세운다. 자동화의 이점은 초기에 붙일수록 크다.
+    - title: 최소 코어 루프로 자르기
+      body: 버티컬 슬라이스는 **최소 핵심 코어 루프** 기준으로 자른다. 유형을 다 덮으려 하지 않는다.

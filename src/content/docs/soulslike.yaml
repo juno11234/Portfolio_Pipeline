@@ -32,6 +32,30 @@ overview:
     단방향 5계층 아키텍처, 입력 2단 릴레이와 플레이어 FSM, 이벤트 큐 전투와 MVVM, 행동 트리 몬스터 AI,
     보스 2페이즈·락온 카메라·월드 게이팅, TSV 데이터 파이프라인과 Jenkins CI를 다룹니다.
     아트·사운드·레벨 디자인은 이 문서의 범위가 아닙니다.
+  stack:
+    title: 계약 기반 · 무참조 결합을 위한 도구 선택
+    rows:
+      - category: 엔진 · 렌더
+        tech: Unity 6000.0.56f1 · URP 17
+        purpose: 3D 소울라이크 액션 · Universal Render Pipeline
+      - category: 입력
+        tech: Input System 1.14
+        purpose: 디바이스 콜백을 의미 이벤트로 변환하는 2단 릴레이
+      - category: 내비게이션
+        tech: AI Navigation 2.0
+        purpose: NavMeshAgent 기반 몬스터 추격·순찰 이동
+      - category: 비동기 처리
+        tech: UniTask
+        purpose: GC 없는 async/await · 씬 페이드 취소 토큰 연동
+      - category: UI
+        tech: uGUI · TextMeshPro
+        purpose: HP·스태미나 바, 인벤토리 드래그 앤 드롭
+      - category: 데이터
+        tech: ScriptableObject · TSV
+        purpose: 리플렉션 제네릭 파서로 기획 데이터를 코드와 분리
+      - category: 빌드 자동화
+        tech: Jenkins
+        purpose: 1시간 주기 폴링 → 배치 모드 빌드 → exit 코드 판정
 screenshot:
   src: ../../assets/soulslike/soul-gameplay.png
   caption: 3인칭 소울라이크 전투 — 락온 인디케이터, HP·스태미나 바, 2페이즈 보스
@@ -50,32 +74,6 @@ architecture:
     시스템은 **입력 → 상태 → 전투 → 데이터 → UI** 방향의 단방향 흐름을 가집니다.
     역방향 통신은 전부 `event` 또는 `Observable<T>`로 이루어져, 하위 계층이 상위 계층을 직접 참조하지 않습니다.
   parts:
-    - badge: 기술 스택
-      title: 계약 기반 · 무참조 결합을 위한 도구 선택
-      blocks:
-        - type: stack-table
-          rows:
-            - category: 엔진 · 렌더
-              tech: Unity 6000.0.56f1 · URP 17
-              purpose: 3D 소울라이크 액션 · Universal Render Pipeline
-            - category: 입력
-              tech: Input System 1.14
-              purpose: 디바이스 콜백을 의미 이벤트로 변환하는 2단 릴레이
-            - category: 내비게이션
-              tech: AI Navigation 2.0
-              purpose: NavMeshAgent 기반 몬스터 추격·순찰 이동
-            - category: 비동기 처리
-              tech: UniTask
-              purpose: GC 없는 async/await · 씬 페이드 취소 토큰 연동
-            - category: UI
-              tech: uGUI · TextMeshPro
-              purpose: HP·스태미나 바, 인벤토리 드래그 앤 드롭
-            - category: 데이터
-              tech: ScriptableObject · TSV
-              purpose: 리플렉션 제네릭 파서로 기획 데이터를 코드와 분리
-            - category: 빌드 자동화
-              tech: Jenkins
-              purpose: 1시간 주기 폴링 → 배치 모드 빌드 → exit 코드 판정
     - badge: 구성요소
       title: 5계층 아키텍처 — 단방향 흐름
       blocks:
@@ -612,27 +610,7 @@ features:
               **시야에서 벗어나도 어그로가 풀리지 않습니다**. 해제는 화톳불 `Respawn()`에서만 —
               "발각되면 끝까지 쫓아온다"는 소울라이크 특성과 일치합니다. 보스는 `BossWall`로 입장을 통제하므로
               이 판정 자체가 없습니다.
-    decisions:
-      - title: 몬스터 AI 구조 — 상태 머신(FSM) vs 행동 트리(BT)
-        options:
-          - { key: A, title: FSM (플레이어와 동일) }
-          - { key: B, title: 행동 트리 (BT), chosen: true }
-        criteria:
-          - label: 상태 증가 대응
-            values:
-              - 상태가 늘수록 전이 조건이 조합적으로 폭발
-              - 항상 트리 구조를 유지 · 노드 추가로 확장
-          - label: 행동 선택
-            values:
-              - 입력에 따른 명시적 전이만
-              - 상황 판단 + 확률적 선택(Selector_Random)
-          - label: 재사용
-            values:
-              - 상태 클래스가 액터별로 묶임
-              - 리프 노드를 조합해 트리를 재조립
-        reason: >-
-          플레이어는 입력이 곧 명시적 상태 전이라 FSM이 맞지만, 몬스터는 "상황 판단 + 확률적 행동 선택"이
-          필요해 BT를 선택했습니다. 같은 액터 계층 안에서 플레이어는 FSM, 몬스터는 BT를 쓰는 **의도적 비대칭**입니다.
+    decisions: []
   - title: 보스 · 카메라 · 월드
     intro: >-
       보스는 체력 절반에서 **2페이즈**로 전환되고, 카메라·락온은 **LateUpdate 순서**로 배치되며,
@@ -759,34 +737,50 @@ features:
               CI 연동의 핵심은 `EditorApplication.Exit(코드)`입니다. Jenkins는 프로세스 **종료 코드로 성공/실패를
               판단**하므로, 명시적 exit 코드 없이는 빌드 실패가 CI에 전달되지 않습니다.
     decisions: []
-decisions: []
+decisions:
+  - title: 몬스터 AI 구조 — 상태 머신(FSM) vs 행동 트리(BT)
+    options:
+      - { key: A, title: FSM (플레이어와 동일) }
+      - { key: B, title: 행동 트리 (BT), chosen: true }
+    criteria:
+      - label: 상태 증가 대응
+        values:
+          - 상태가 늘수록 전이 조건이 조합적으로 폭발
+          - 항상 트리 구조를 유지 · 노드 추가로 확장
+      - label: 행동 선택
+        values:
+          - 입력에 따른 명시적 전이만
+          - 상황 판단 + 확률적 선택(Selector_Random)
+      - label: 재사용
+        values:
+          - 상태 클래스가 액터별로 묶임
+          - 리프 노드를 조합해 트리를 재조립
+    reason: >-
+      플레이어는 입력이 곧 명시적 상태 전이라 FSM이 맞지만, 몬스터는 "상황 판단 + 확률적 행동 선택"이
+      필요해 BT를 선택했습니다. 같은 액터 계층 안에서 플레이어는 FSM, 몬스터는 BT를 쓰는 **의도적 비대칭**입니다.
 retrospective:
-  parts:
-    - badge: 만족
-      title: 만족스러운 부분
-      blocks:
-        - type: points
-          variant: numbered
-          columns: 2
-          items:
-            - tag: '01'
-              title: 긴장감 있는 AI
-              body: 단순 추격·공격만 하던 몬스터를 **공격 템포를 조절하는 긴장감 있는 AI**로 발전시켰습니다.
-            - tag: '02'
-              title: 이벤트 하나로 2페이즈
-              body: '**MVVM의 느슨한 결합** 덕분에 이벤트 하나로 보스 2페이즈(공격 패턴 개방 + 파티클)를 깔끔히 연동할 수 있었습니다.'
-  # 아쉬웠던 점·깨달은 점(디자인 07)을 남은 기술 부채로, 다음 계획을 개선 계획으로 옮겼다.
-  debt:
-    - >-
-      `Sequence`와 `Selector` 모두 노드가 중단될 때 정리할 표준 방법이 없어 같은 원인의 문제를 겪었다.
-      `Sequence_Memory`와 `Cleaner`로 각각 대응했지만, 중단 시 상태 정리가 노드 계약에 표준화돼 있지 않다.
-    - >-
-      행동 트리의 문제 지점을 코드로만 추적하다 늦게 발견했다. 기술 문서를 위해 그린 다이어그램에서야 한눈에
-      보였다 — 도식화하며 디버깅했다면 시간을 크게 줄였을 것이다.
-    - 노드를 `enum`으로 분류만 했을 뿐 트리 구조 자체를 데이터 테이블화하지 못했다. AI 패턴을 바꾸려면 여전히 코드를 수정해야 한다.
-  plan:
-    - >-
-      **완전한 데이터 주도 구조**로 확장한다. 개발 편의뿐 아니라 다른 파트 개발진과의 협업을 위해서라도
-      필수라 보고 적극 적용할 계획이다.
-    - '**비선형 자료구조는 설계 단계에서 미리 도식화**한 뒤 구현한다. 시각화가 디버깅 시간을 줄인다는 것을 이번에 확인했다.'
-    - 다음 BT에는 `conditional abort`(매 프레임 상위 조건을 재평가하고, 조건이 바뀌면 Running 중인 하위 노드를 정리)를 구현한다.
+  satisfaction:
+    - title: 긴장감 있는 AI
+      body: 단순 추격·공격만 하던 몬스터를 **공격 템포를 조절하는 긴장감 있는 AI**로 발전시켰습니다.
+    - title: 이벤트 하나로 2페이즈
+      body: '**MVVM의 느슨한 결합** 덕분에 이벤트 하나로 보스 2페이즈(공격 패턴 개방 + 파티클)를 깔끔히 연동할 수 있었습니다.'
+  learnings:
+    - title: 같은 원리의 노드 중단
+      body: >-
+        `Sequence`와 `Selector` 모두 노드가 중단될 때 정리할 표준 방법이 없어 같은 원인의 문제를 겪었지만,
+        각각 ==Sequence_Memory==와 ==Cleaner==라는 서로 다른 방법으로 해결했습니다.
+    - title: 시각화의 가치
+      body: >-
+        코드로는 추적이 힘들던 행동 트리의 문제 지점이, **기술 문서를 위해 그린 다이어그램에서는 한눈에** 보였습니다.
+        도식화하며 디버깅했다면 시간을 크게 줄일 수 있었을 것입니다.
+    - title: 데이터 주도 BT의 가능성
+      body: >-
+        노드를 `enum`으로 분류하는 과정에서, **트리 구조 자체를 데이터 테이블화**해 코드 수정 없이 AI 패턴을
+        조립하는 구조로 확장할 수 있겠다고 느꼈습니다.
+  improvements:
+    - title: 완전한 데이터 주도 구조
+      body: 개발 편의뿐 아니라 **다른 파트 개발진과의 협업 구조**를 위해서라도 필수라 보고 적극 적용할 계획입니다.
+    - title: 비선형 자료구조 시각화
+      body: 구조가 복잡한 비선형 자료구조는 **설계 단계에서 미리 도식화**하여 구현할 계획입니다.
+    - title: 중단 매커니즘 추가
+      body: 다음 BT에는 `conditional abort`(매 프레임 상위 조건을 재평가하고, 조건이 바뀌면 Running 중인 하위 노드를 정리)를 구현할 계획입니다.

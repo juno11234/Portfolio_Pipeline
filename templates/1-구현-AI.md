@@ -35,11 +35,12 @@
 - **lead**(선택): «대표 요약 한 문단»
 - **what**: «이 문서가 다루는 것 = 지도» (양식 ②의 why 와 짝이 되어 WHAT/WHY 2단)
 - **scope**: «다루지 않는 것까지 그어라. 예: …를 다룬다. 아트 · 사운드는 범위가 아니다»
+- **기술 스택**: 분류 · 기술 · **사용 목적(왜 이 기술)** 을 줄줄이. **개요 섹션 끝**에 들어간다(세 디자인 공통 —
+  무엇으로 만들었나를 먼저 보인다). 목적 없이 기술 이름만 나열 금지.
 > why · evidence(동기 · 측정값)는 양식 ②. 개요 가운데는 WHAT/WHY 2단 또는 목표 카드 중 하나.
 
 ## A2. 시스템 구조 — 말로 서술 (그림은 PART B 가 그린다)
 - **intro**(선택): «섹션 첫 문단»
-- **기술 스택**: 분류 · 기술 · **사용 목적(왜 이 기술)** 을 줄줄이. (목적 없이 기술 이름만 나열 금지)
 - **계층 구성**: 위→아래 계층과 각 계층의 노드. + **구성요소**(무엇으로) · **관계**(누가 누구를 알고 · 제어) · **흐름**(입력→…→출력) 세 줄.
 - **핵심 클래스 관계**: 어떤 인터페이스 · 추상 · 상속 계약이 있고 누가 구현하나. (관계만 적는다 — 그림은 PART B)
 
@@ -59,7 +60,7 @@
 > 스키마: `src/content.config.ts`. 본보기로 삼는다: `src/content/docs/{vampire-like,bond,soulslike}.yaml`.
 
 ## B1. 블록 매핑 — PART A 의 서술을 YAML `type` 으로
-- 기술 스택 → `type: stack-table` (purpose 필수)
+- 기술 스택 → **개요의 `overview.stack`** {title, rows[분류·기술·목적]} (purpose 필수). 본문 블록이 아니라 **개요 섹션**에 렌더된다.
 - 계층 구성 + 세 줄 → `type: layers` (components · relations · flow 필수. 강조=핵심 하나, 점선=런타임에 없는 것)
 - 핵심 코드 → `type: code` (api · code · **notes 필수**)
 - 수치/항목 표 → `type: table` (행 칸 수 = 헤더 수) · 단계 흐름 → `type: chips`(분기 생기면 mermaid) · 항목 카드 → `type: points`(2개+)
@@ -76,7 +77,7 @@
 ## B3. 게이트 — 어기면 빌드가 깨진다
 - [ ] 개요: (what+why) 또는 goals 중 하나 · **evidence · scope 필수**
 - [ ] **고민과 선택 최소 1건**(②) · 각 결정 정확히 1개 채택 · 기준의 값 수 = 선택지 수
-- [ ] **retrospective 의 debt · plan 필수**(②)
+- [ ] **retrospective 의 learnings(깨달음) · improvements(개선) 필수**(②)
 - [ ] code 는 notes · stack-table 은 purpose · api-list 는 returns · image/screenshot 은 caption 필수 · table 은 행 칸 수 = 헤더 수
 - [ ] 필수 항목을 optional 로 완화해 통과시키지 않는다 — 그건 게이트를 무력화하는 것이다.
 

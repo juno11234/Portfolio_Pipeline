@@ -62,6 +62,39 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <slot />
       </main>
     </div>
+
+    {/* 다이어그램·이미지 확대 — 클릭하면 전체화면으로 크게 본다. 확대 전용 소량 스크립트다. */}
+    <div id="zoom" hidden><div id="zoom-inner"></div></div>
+    <script is:inline>
+      (function () {
+        const overlay = document.getElementById('zoom');
+        const inner = document.getElementById('zoom-inner');
+        if (!overlay || !inner) return;
+        const open = (node) => { inner.replaceChildren(node); overlay.hidden = false; document.documentElement.style.overflow = 'hidden'; };
+        const close = () => { overlay.hidden = true; inner.replaceChildren(); document.documentElement.style.overflow = ''; };
+        overlay.addEventListener('click', close);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+        document.addEventListener('click', (e) => {
+          const dia = e.target.closest('.dia-body');
+          if (dia) {
+            const svg = dia.querySelector('svg');
+            if (svg) {
+              const c = svg.cloneNode(true);
+              c.removeAttribute('width'); c.removeAttribute('height');
+              c.style.width = 'min(94vw, 1500px)'; c.style.height = 'auto';
+              open(c);
+            }
+            return;
+          }
+          const img = e.target.closest('#doc figure img');
+          if (img) {
+            const c = document.createElement('img');
+            c.src = img.getAttribute('src'); c.alt = img.getAttribute('alt') || '';
+            open(c);
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
 
@@ -84,4 +117,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     .shell { flex-direction: column; }
     .main { padding: 30px 20px 48px; }
   }
+</style>
+
+<style is:global>
+  /* 다이어그램·이미지 확대 오버레이 (#1 돋보기) */
+  #zoom { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(23, 24, 26, .93); cursor: zoom-out; overflow: auto; }
+  #zoom[hidden] { display: none; }
+  #zoom-inner svg, #zoom-inner img { background: #fff; border-radius: 10px; padding: 16px; box-sizing: border-box; box-shadow: 0 24px 70px rgba(0, 0, 0, .45); }
+  #zoom-inner img { max-width: 94vw; max-height: 90vh; width: auto; height: auto; }
+  #zoom-inner svg { max-height: 90vh; }
+  /* 확대 가능 힌트 */
+  #doc .dia-body, #doc figure img { cursor: zoom-in; }
 </style>

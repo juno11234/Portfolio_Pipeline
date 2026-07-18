@@ -25,7 +25,8 @@ import OverviewLede from '../../components/dc/OverviewLede.astro';
 import GoalCards from '../../components/dc/GoalCards.astro';
 import Tldr from '../../components/dc/Tldr.astro';
 import Decision from '../../components/dc/Decision.astro';
-import LessonCard from '../../components/dc/LessonCard.astro';
+import StackTable from '../../components/dc/StackTable.astro';
+import PrincipleCards from '../../components/dc/PrincipleCards.astro';
 import DocBlock from '../../components/DocBlock.astro';
 
 /** 기술 문서가 있는 프로젝트만 페이지를 만든다. 아직 문서 없는 프로젝트는 자동으로 빠진다. */
@@ -115,6 +116,9 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
           ))}
         </ul>
       )}
+      {/* 기술 스택 — 개요 끝. 세 디자인 모두 섹션 01에 둔다(무엇으로 만들었나를 먼저 보인다). */}
+      <PartTitle badge="기술 스택" title={d.overview.stack.title} margin="30px 0 6px" />
+      <div class="stack-wrap"><StackTable rows={d.overview.stack.rows} widths={[118, 180]} /></div>
     </SectionHead>
 
     {/* ② 시스템 구조 + ③ 핵심 기능 */}
@@ -132,12 +136,6 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
                 : <h3 class="ph3" style={`margin:${partMargin(pi)}`}>{part.title}</h3>}
               {part.lede !== undefined && <p class="plede" set:html={rich(part.lede)} />}
               {part.blocks.map((block) => <DocBlock block={block} />)}
-            </>
-          ))}
-          {'decisions' in section && section.decisions.map((dec, i) => (
-            <>
-              <PartTitle badge={`결정 ${i + 1}`} title={dec.title} margin="44px 0 6px" />
-              <Decision options={dec.options} criteria={dec.criteria} reason={dec.reason} />
             </>
           ))}
         </SectionHead>
@@ -169,29 +167,16 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
           <ul class="results">{d.retrospective.results.map((r) => <li set:html={rich(r)} />)}</ul>
         </>
       )}
-      {d.retrospective.troubleshooting.map((t) => (
-        <LessonCard
-          title={t.problem}
-          kind="plain"
-          margin="14px 0"
-          cells={[{ label: '원인', body: t.cause }, { label: '해결', body: t.fix }, { label: '알게된 점', body: t.lesson }]}
-        />
-      ))}
-      {d.retrospective.parts.map((part, pi) => (
+      {d.retrospective.satisfaction !== undefined && (
         <>
-          {part.badge !== undefined
-            ? <PartTitle badge={part.badge} title={part.title} margin={partMargin(pi)} />
-            : <h3 class="ph3" style={`margin:${partMargin(pi)}`}>{part.title}</h3>}
-          {part.lede !== undefined && <p class="plede" set:html={rich(part.lede)} />}
-          {part.blocks.map((block) => <DocBlock block={block} />)}
+          <PartTitle badge="만족" title="만족스러운 부분" margin="36px 0 6px" />
+          <PrincipleCards margin="16px 0 4px" cards={d.retrospective.satisfaction} />
         </>
-      ))}
-      <h3 class="ph3" style="margin:40px 0 6px">남은 기술 부채와 개선 계획</h3>
-      <p class="plede">한계를 아는 것도 실력의 증거입니다.</p>
-      <div class="debt-cols">
-        <div><h4>아쉬운 점</h4><ul class="debt">{d.retrospective.debt.map((x) => <li set:html={rich(x)} />)}</ul></div>
-        <div><h4>다음엔 이렇게</h4><ul class="plan">{d.retrospective.plan.map((x) => <li set:html={rich(x)} />)}</ul></div>
-      </div>
+      )}
+      <PartTitle badge="깨달음" title="아쉬웠던 점 · 깨달은 점" margin="40px 0 6px" />
+      <PrincipleCards margin="16px 0 4px" cards={d.retrospective.learnings} />
+      <PartTitle badge="개선" title="다음 계획" margin="40px 0 6px" />
+      <PrincipleCards margin="16px 0 4px" cards={d.retrospective.improvements} />
     </SectionHead>
 
     <DocFooter thanks="감사합니다" thanksSub="THANK YOU" byline={byline} />
@@ -219,6 +204,8 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
   .links { display: flex; gap: 7px; flex-wrap: wrap; }
   .links a { display: inline-flex; align-items: center; gap: 6px; background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 700; padding: 8px 14px; border-radius: 999px; }
   .links a span { font: 400 11px var(--mono); color: #8fb4f8; }
+
+  .stack-wrap { overflow-x: auto; margin: 4px 0 8px; }
 
   .results { display: grid; gap: 6px; margin: 14px 0; }
   .results li { font-size: 13.5px; line-height: 1.65; color: var(--ink-soft); padding-left: 15px; position: relative; }

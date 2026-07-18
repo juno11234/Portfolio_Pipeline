@@ -111,6 +111,9 @@ const projects = defineCollection({
 /** 문단 묶음. 빈 문단이나 빈 배열을 막는다. */
 const paragraphs = z.array(z.string().min(1)).min(1);
 
+/** 회고 카드 한 장 — 작은 제목 + 내용. 만족·깨달음·개선 세 묶음이 공유한다. */
+const retroCard = z.object({ title: z.string().min(1), body: z.string().min(1) });
+
 /* ============================================================================
  * 기술 문서 블록
  *
@@ -572,6 +575,18 @@ const projectDocs = defineCollection({
       evidence: z.string().min(1),
       /** 범위 — 이 문서가 다루지 않는 것까지 그어준다 */
       scope: z.string().min(1),
+      /**
+       * 기술 스택. 세 디자인 모두 개요(섹션 01)에 둔다 — 무엇으로 만들었나를 먼저 보인다.
+       * purpose(사용 목적)를 필수로 둬 기술 이름만 나열하는 것을 막는다.
+       */
+      stack: z.object({
+        title: z.string().min(1),
+        rows: z.array(z.object({
+          category: z.string().min(1),
+          tech: z.string().min(1),
+          purpose: z.string().min(1),
+        })).min(1),
+      }),
     }),
 
     /**
@@ -633,22 +648,15 @@ const projectDocs = defineCollection({
       /** 섹션 헤더 바로 아래 한 문단(첫 꼭지 앞). 없어도 된다. */
       intro: z.string().min(1).optional(),
       parts: z.array(partSchema(image)).min(1),
-      /**
-       * ④ 고민과 선택 — 이 기능을 만들며 내린 판단.
-       *
-       * Bond는 결정을 해당 기능 섹션 안에 둔다
-       * ('절차적 맵 생성'의 씬 경계 데이터 전달 방식, '연출·이펙트'의 이팩트 재생 방식).
-       */
-      decisions: z.array(decisionBlock).default([]),
     })).min(1),
 
     /**
-     * ④ 고민과 선택 — 독립 섹션으로 모아 보여줄 때.
+     * ④ 고민과 선택 — 핵심 기능과 **분리된 독립 섹션**이다.
      *
-     * 뱀서라이크는 핵심 기능이 한 덩어리라 결정 두 개를 '04 고민과 선택'으로 뽑아놨다.
-     * 기능별로 흩을지 한데 모을지는 프로젝트 크기가 정한다. 둘 다 허용한다.
+     * 기능이 많아 features 를 여러 섹션으로 쪼개도, 결정은 기능 안에 섞지 않고 여기 한데 모은다
+     * (가이드의 뱀서식 '04 고민과 선택'). 트레이드오프 표 + 결정 이유로 보인다.
      *
-     * 다만 **문서 전체에 결정이 하나도 없으면 빌드가 깨진다** (아래 superRefine).
+     * **문서 전체에 결정이 하나도 없으면 빌드가 깨진다** (아래 superRefine).
      * 가이드: "'그냥'은 금지어. 신입에게 기대하는 건 기술력이 아니라 사고 과정 —
      * 면접관이 가장 보고 싶어 하는 부분." Coder와 Developer를 가르는 지점이다.
      */
@@ -657,34 +665,21 @@ const projectDocs = defineCollection({
     /**
      * ⑤ 결과·회고 — 가이드 Part 2의 마지막 단계.
      *
-     * "'다 만들었다'는 선언이 아닙니다. 개요에서 세운 목표(Why)가 달성됐는지
-     * 데이터로 보이고, 배운 점을 다음 사람이 쓸 수 있게 남깁니다."
+     * 세 디자인이 공통으로 쓰는 **만족 · 깨달음 · 개선** 세 묶음을 카드(작은 제목 + 내용)로 담는다.
+     * 가이드: "'다 만들었다'는 선언이 아닙니다. 목표가 달성됐는지 데이터로 보이고, 배운 점을 남깁니다."
      *
-     * debt와 plan을 필수로 둔 것이 이 스키마에서 가장 중요한 판단이다.
-     * 가이드: "'아쉬운 점 없습니다'는 0점. 기술 부채를 인지하고 개선을 제시하는 사람이
-     * 성장 가능성을 인정받습니다."
-     *
-     * **회고 서술도 문서마다 다르다** — 세 디자인이 반증했다(뱀서 결과·트러블슈팅 · Bond 대조·통찰
-     * 카드 · Soul 만족·데이터·빌드). 그래서 서술은 features 처럼 자유 `parts` 로 열되,
-     * **debt·plan(부채·계획)만은 형식과 무관하게 필수로 남긴다.** 이게 게이트다 —
-     * 화려한 서술은 자유롭게, "아쉬운 점과 그래서 어떻게" 는 반드시.
+     * **learnings(깨달음/아쉬움)·improvements(개선/계획)를 필수로 둔 것이 게이트다.**
+     * 가이드: "'아쉬운 점 없습니다'는 0점. 부채를 인지하고 개선을 제시하는 사람이 성장 가능성을 인정받는다."
      */
     retrospective: z.object({
-      /** 목표 달성을 데이터로. Bond 처럼 수치 결과가 없는 문서는 생략 가능. */
+      /** 결과 — 목표 달성을 수치로. 없는 문서는 생략 가능. */
       results: z.array(z.string().min(1)).min(1).optional(),
-      /** 무엇이 문제였고 원인이 무엇이었나 (뱀서식 정형 트러블슈팅) */
-      troubleshooting: z.array(z.object({
-        problem: z.string().min(1),
-        cause: z.string().min(1),
-        fix: z.string().min(1),
-        lesson: z.string().min(1),
-      })).default([]),
-      /** 자유 서술 꼭지. Bond 잘한점(대조·통찰), Soul 만족·데이터·빌드 등. 꼭지 모양은 본문과 같다. */
-      parts: z.array(partSchema(image)).default([]),
-      /** 남은 기술 부채. 비워둘 수 없다. */
-      debt: z.array(z.string().min(1)).min(1),
-      /** 그래서 다음엔 어떻게 할 것인가. 부채만 적고 계획이 없으면 반쪽이다. */
-      plan: z.array(z.string().min(1)).min(1),
+      /** 만족스러운 부분 — 무엇을 잘했나. 카드. 선택. */
+      satisfaction: z.array(retroCard).min(1).optional(),
+      /** 아쉬웠던 점·깨달은 점 — 카드. **필수 게이트.** */
+      learnings: z.array(retroCard).min(1),
+      /** 다음 계획(개선) — 카드. **필수 게이트.** 부채만 적고 계획이 없으면 반쪽이다. */
+      improvements: z.array(retroCard).min(1),
     }),
   }).superRefine((doc, ctx) => {
     /*
@@ -703,27 +698,23 @@ const projectDocs = defineCollection({
     }
 
     /*
-     * 결정은 기능 안에 있어도 되고(Bond) 따로 모아도 된다(뱀서라이크).
-     * 어디에 있든 **문서 전체에 하나도 없으면 안 된다.**
-     * 가이드: "'그냥'은 금지어. 모든 선택엔 이유가 있어야 합니다."
+     * 결정은 핵심 기능과 분리된 독립 섹션(최상위 decisions)에 모은다.
+     * **문서 전체에 하나도 없으면 안 된다.** 가이드: "'그냥'은 금지어."
      */
-    const inFeatures = doc.features.flatMap((f) => f.decisions.map((d) => [f.title, d] as const));
-    const standalone = doc.decisions.map((d) => ['고민과 선택', d] as const);
-    const all = [...inFeatures, ...standalone];
+    const all = doc.decisions.map((d) => ['고민과 선택', d] as const);
 
     if (all.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message:
-          '이 문서에 의사결정이 하나도 없습니다. features[].decisions 나 최상위 decisions 중 ' +
-          '어디든 최소 하나는 있어야 합니다. 무엇을 만들었는지만 있고 왜 그렇게 했는지가 없는 ' +
-          '문서는 판단을 보여주지 못합니다.',
+          '이 문서에 의사결정이 하나도 없습니다. 최상위 decisions 에 최소 하나는 있어야 합니다. ' +
+          '무엇을 만들었는지만 있고 왜 그렇게 했는지가 없는 문서는 판단을 보여주지 못합니다.',
       });
     }
     all.forEach(([where, d], i) => checkDecision(d, `${where} #${i + 1}`, ctx));
 
-    /* 표의 열 개수 검사 — ②·③ 꼭지와 회고 자유 꼭지를 모두 훑는다 */
-    const groups = [doc.architecture, ...doc.features, { title: '결과·회고', parts: doc.retrospective.parts }];
+    /* 표의 열 개수 검사 — ②·③ 꼭지를 훑는다 */
+    const groups = [doc.architecture, ...doc.features];
     for (const g of groups) {
       for (const part of g.parts) {
         for (const block of part.blocks) {
