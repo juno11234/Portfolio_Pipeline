@@ -614,6 +614,41 @@ features:
             rows:
               - [CameraShakeTrack, CinemachineBasicMultiChannelPerlin, totalWeight += weight]
               - [SilhouetteTrack, SpriteRenderer, MaterialPropertyBlock _BlendFactor 보간 · totalWeight += weight × fadeWeight]
+  # 'AI 활용 개발' — 옛 PDF/디자인 판에 있던 섹션을 사용자 요청으로 되살렸다(핵심 기능 뒤에 배치).
+  # 결함 3건 DefectList(B1~B3)는 그 판 내용 그대로. ②의 회고 satisfaction 은 이와 다른 3건을 terse 하게
+  # 적었어서, 중복·상충을 피해 회고 카드는 일반화하고 상세는 이 DefectList 에 뒀다. (아래 회고 주석 참조)
+  - title: AI 활용 개발
+    intro: AI를 개발 프로세스의 **단계별 전문 에이전트**로 분리하고 호출 규칙을 `.md` 파일로 명문화했습니다. 컨텍스트 오염을 방지하고 산출물의 일관성을 유지하는 것이 목적입니다.
+    parts:
+      - badge: 에이전트 구성
+        title: Plan · Build · Review 3 역할
+        blocks:
+          - type: points
+            variant: flow
+            items:
+              - { tag: '01 · PLAN', title: 계획 수립, body: '요구사항을 읽고 **계획 md**를 산출. 구현 범위 · 인터페이스 · 순서를 문서로 확정' }
+              - { tag: '02 · BUILD', title: 구현, body: '확정된 **계획 md만** 근거로 코드를 작성. 임의 확장 없이 계획 범위를 지킴' }
+              - { tag: '03 · REVIEW', title: 정적 리뷰, body: '코드를 ==정적 분석==해 결함 · 규칙 위반을 실행 전에 검출' }
+      - badge: 루프
+        title: 스크립트가 아니라 계획 파일을 고친다
+        lede: 스크립트를 반복 생성 · 수정시키는 대신 **계획 md 한 파일**만 고칩니다. 원하는 결과까지의 ==토큰과 탐색 비용==이 줄어듭니다.
+        blocks:
+          - type: chips
+            variant: loop
+            items:
+              - { label: 계획 md 수정, arrow: → }
+              - { label: Build 재생성, arrow: → }
+              - { label: 주석으로 설계 교정, arrow: → }
+              - { label: 주석 확인 · 계획 반영, arrow: ⟳ }
+      - badge: Reviewer
+        title: 정적 분석이 리뷰 단계에서 잡은 결함 3건
+        blocks:
+          - type: points
+            variant: defect
+            items:
+              - { tag: B1, title: TurnManager.SwitchBattle — CTS 잔류, body: '`m_cts = new()` 이후에 null 인자를 검사해, LogError로 빠지면 `m_cts`가 non-null로 남아 다음 `OnBattle`이 전투 종료로 오작동' }
+              - { tag: B2, title: CharacterSelectChannel — 단일 정적 TCS, body: '`_tcs`가 정적 단일 슬롯이라 캐릭터 선택 요청이 겹치면 이전 TCS가 유실 → `await`가 영구 대기' }
+              - { tag: B3, title: HandleBattleChoice — Pending Report 누수, body: '전투 설정이 없거나 몬스터 풀이 비면 `CancelPendingReport()` 없이 return → 열린 저널 리포트가 다음 이벤트까지 잔류' }
 
 # ── ④ 고민과 선택 (② 사람이 쓴 판단) ─────────────────────────────────────
 decisions:
@@ -717,10 +752,13 @@ retrospective:
       body: >-
         전투 루프를 계산 파이프라인과 연출 시스템으로 분기하고, 스킬 컷씬은 델리게이트 체인 미들웨어로 전투 코드
         수정 없이 끼워 넣었습니다.
+    # ⚠ ② 원문은 여기서 결함 3건을 '중복 호출 시 오브젝트 누적 · 배열 불일치 예외 · 이중 로드 방지 누락'으로 적었으나,
+    #   위 'AI 활용 개발' DefectList(B1~B3: CTS 잔류 · TCS 유실 · Pending Report 누수)와 다른 3건이라 상충한다.
+    #   중복·상충을 피해 카드는 일반화하고 상세는 DefectList 에 뒀다. 어느 3건이 맞는지는 사용자 확인 필요.
     - title: AI 리뷰로 사전 결함 제거
       body: >-
-        Reviewer 에이전트의 정적 분석으로 코드 리뷰 단계에서 결함 3건(중복 호출 시 오브젝트 누적 · 배열 불일치 예외 ·
-        이중 로드 방지 누락)을 미리 제거했습니다.
+        Reviewer 에이전트의 정적 분석으로 코드 리뷰 단계에서 결함 3건을 실행 전에 미리 제거했습니다 — 상세는 위
+        '**AI 활용 개발**'의 결함 목록(B1~B3)을 참고하세요.
   learnings:
     - title: 버티컬 슬라이스를 과하게 잡음
       body: >-
