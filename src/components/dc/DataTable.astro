@@ -1,0 +1,57 @@
+---
+/**
+ * 일반 표 — 기술 스택 표(StackTable) 말고 본문에서 쓰는 표.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `SkillBase 4종과 레벨업 계산` 표.
+ *
+ * StackTable 과 합치지 않은 이유는 셋이 다르기 때문이다 —
+ * 글자 크기(13px↔12.5px) · 칸 여백(11px 12px↔10px) · 열 폭 지정 유무.
+ * 겉보기에 비슷하다고 합치면 둘 중 하나가 원본과 어긋난다.
+ *
+ * 첫 열만 진한 잉크 + 굵게다. 그 열이 '무엇에 대한 행인지'를 말하기 때문이다.
+ * 원본이 첫 칸에 클래스 이름을 작은 모노 회색으로 덧붙이는 자리가 있어 sub 로 받는다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Row {
+  /** 첫 칸. 진한 잉크 + 굵게. */
+  label: string;
+  /** 첫 칸에 덧붙는 작은 모노 회색 글자. 예: CircleAttack */
+  sub?: string;
+  /** 둘째 칸부터. headers 개수 - 1 개여야 한다. */
+  cells: string[];
+}
+
+interface Props {
+  headers: string[];
+  rows: Row[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { headers, rows, margin } = Astro.props;
+
+/* 원본이 칸마다 반복하는 style */
+const TH =
+  "text-align:left;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#8a8b90;text-transform:uppercase;padding:9px 10px;border-bottom:1.5px solid rgba(20,22,26,.16)";
+const TD = 'padding:10px;border-bottom:1px solid rgba(20,22,26,.07)';
+---
+
+<table style={`width:100%;border-collapse:collapse;margin:${margin};font-size:12.5px`}>
+  <thead>
+    <tr>
+      {headers.map((h) => <th style={TH}>{h}</th>)}
+    </tr>
+  </thead>
+  <tbody>
+    {rows.map((r) => (
+      <tr>
+        <td style={`${TD};color:#17181a;font-weight:600`}>{r.label}{r.sub !== undefined && (
+          <>{' '}<span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#8a8b90">{r.sub}</span></>
+        )}</td>
+        {r.cells.map((c) => <td style={`${TD};color:#44454a`} set:html={rich(c)} />)}
+      </tr>
+    ))}
+  </tbody>
+</table>

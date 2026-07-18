@@ -1,0 +1,58 @@
+---
+/**
+ * 역제안 — 문제(빨강) vs 역제안(파랑) 2열 + 아래 결과 바.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `완료 콜백 채널 — AI 제안을 내가 뒤집다` 덩어리.
+ *
+ * 이 문서에서 가장 값진 블록 중 하나다. 가이드: "AI 가 못 하는 것: '왜' — 내 실제 의사결정."
+ * AI 가 준 설계(문제)를 내가 왜 뒤집었는지(역제안)를 나란히 놓고, 무엇을 얻었는지(결과)로 닫는다.
+ *
+ * Decision(A/B/C 비교 그리드)과 다르다 — 저쪽은 여러 선택지를 같은 잣대로 재고,
+ * 이쪽은 **하나를 뒤집는** 이야기라 문제 → 역제안 → 결과의 2열+바 구조다.
+ * 왼쪽은 빨강(문제였다), 오른쪽은 파랑(이렇게 바꿨다). 색이 곧 전후다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Side {
+  /** 배지 글자. 예: 문제 · 역제안 */
+  badge: string;
+  /** 배지 옆 소제목. 예: 단일 슬롯 콜백 · Stack 채널 */
+  title: string;
+  body: string;
+}
+
+interface Props {
+  /** 왼쪽 — 원래 있던(AI 가 준) 설계. 빨강. */
+  problem: Side;
+  /** 오른쪽 — 내가 뒤집은 설계. 파랑. */
+  counter: Side;
+  /** 아래 결과 바. 그래서 무엇을 얻었나. */
+  result: string;
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0` */
+  margin: string;
+}
+
+const { problem, counter, result, margin } = Astro.props;
+
+const BADGE_RED = "font:700 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#b91c1c;background:#fbeaea;border:1px solid #f0cccc;border-radius:5px;padding:3px 7px";
+const BADGE_BLUE = "font:700 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#fff;background:#2563eb;border-radius:5px;padding:3px 7px";
+const HEAD_ROW = 'display:flex;align-items:center;gap:7px;margin-bottom:9px';
+---
+
+<div style={`border:1px solid rgba(20,22,26,.12);border-radius:14px;overflow:hidden;margin:${margin}`}>
+  <div style="display:grid;grid-template-columns:1fr 1fr">
+    <div style="padding:16px 18px;background:#fafafa;border-right:1px solid rgba(20,22,26,.08)">
+      <div style={HEAD_ROW}><span style={BADGE_RED}>{problem.badge}</span><span style="font-size:12.5px;font-weight:700;color:#55565a">{problem.title}</span></div>
+      <div style="font-size:12.5px;line-height:1.6;color:#55565a" set:html={rich(problem.body)} />
+    </div>
+    <div style="padding:16px 18px;background:#f8faff">
+      <div style={HEAD_ROW}><span style={BADGE_BLUE}>{counter.badge}</span><span style="font-size:12.5px;font-weight:700;color:#1d4ed8">{counter.title}</span></div>
+      <div style="font-size:12.5px;line-height:1.6;color:#33343a" set:html={rich(counter.body)} />
+    </div>
+  </div>
+  <div style="padding:13px 16px;background:#fff;border-top:1px solid rgba(20,22,26,.1);display:flex;gap:12px;align-items:flex-start">
+    <span style="font:700 11px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:6px;padding:5px 9px;flex:none">결과</span>
+    <span style="font-size:12.5px;line-height:1.6;color:#44454a" set:html={rich(result)} />
+  </div>
+</div>

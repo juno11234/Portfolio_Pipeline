@@ -1,0 +1,44 @@
+---
+/**
+ * 카드 3장 — 나란히 세운 요약 카드. 큰 파란 번호는 있어도 되고 없어도 된다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: 뱀서 `설계 원칙 · 반복되는 세 가지 패턴`(번호 있음) ·
+ * Bond `Strategy 패턴 · Fisher-Yates · 결정론`(번호 없음).
+ *
+ * 번호를 22px 파랑으로 크게 세우면 '이 문서에 이 규칙이 N개'로 읽힌다. 뱀서가 그렇게 쓴다.
+ * Bond 는 같은 카드에서 번호를 뺐다 — 순서가 중요치 않은 세 특성을 나란히 놓을 뿐이라서다.
+ * 카드 style 은 한 글자도 다르지 않다. num 유무만 갈린다. 그래서 한 컴포넌트로 둔다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Card {
+  /** 큰 파란 번호. '01' 처럼 두 자리로. 생략하면 번호 줄을 통째로 뺀다. */
+  num?: string;
+  title: string;
+  body: string;
+}
+
+interface Props {
+  cards: Card[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0 4px` */
+  margin: string;
+}
+
+const { cards, margin } = Astro.props;
+
+/* 원본이 카드마다 반복하는 style */
+const CARD = 'border:1px solid rgba(20,22,26,.1);border-radius:11px;padding:15px 15px;background:#fff';
+---
+
+<div style={`display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:${margin}`}>
+  {cards.map((c) => (
+    <div style={CARD}>
+      {c.num !== undefined && (
+        <div style="font-size:22px;font-weight:800;color:#2563eb;letter-spacing:-.02em;margin-bottom:6px">{c.num}</div>
+      )}
+      <div style="font-size:13.5px;font-weight:700;color:#17181a;margin-bottom:5px">{c.title}</div>
+      <div style="font-size:12px;line-height:1.55;color:#55565a" set:html={rich(c.body)} />
+    </div>
+  ))}
+</div>

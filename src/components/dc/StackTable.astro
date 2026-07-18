@@ -15,9 +15,18 @@ import { rich } from '../../lib/rich';
 
 interface Props {
   rows: Array<{ category: string; tech: string; purpose: string }>;
+  /**
+   * 앞 두 열의 폭 [분류, 기술]. 원본이 문서마다 다른 값을 준다 —
+   * 뱀서라이크 [118, 180] · Bond [124, 172]. 셋째 열(사용 목적)은 폭을 안 준다.
+   *
+   * 처음엔 118/180 을 박아뒀는데 Bond 가 반증했다. 합은 뱀서 298 · Bond 296 으로 거의
+   * 같으니 디자인 툴의 자동 열맞춤에서 생긴 흔들림으로 보이지만, 여기서 임의로 통일하지
+   * 않는다 — 원본을 그대로 재현하고, 고칠 거면 claude.ai/design 에서 고쳐 다시 떠 온다.
+   */
+  widths: [number, number];
 }
 
-const { rows } = Astro.props;
+const { rows, widths } = Astro.props;
 
 /* 원본이 셀마다 반복하는 style. 한 곳에 두고 돌린다. */
 const TH =
@@ -28,8 +37,8 @@ const TD_BASE = 'padding:11px 12px;border-bottom:1px solid rgba(20,22,26,.07)';
 <table style="width:100%;border-collapse:collapse;margin:16px 0 8px;font-size:13px">
   <thead>
     <tr>
-      <th style={`${TH};width:118px`}>분류</th>
-      <th style={`${TH};width:180px`}>기술</th>
+      <th style={`${TH};width:${widths[0]}px`}>분류</th>
+      <th style={`${TH};width:${widths[1]}px`}>기술</th>
       <th style={TH}>사용 목적</th>
     </tr>
   </thead>

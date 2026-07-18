@@ -1,0 +1,45 @@
+---
+/**
+ * 개요 가운데 — 목표 카드 2장. **Bond 가 쓰는 모양이다.**
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `목표 ① 구조 개선` / `목표 ② 프로세스 검증` 두 칸.
+ *
+ * 뱀서라이크는 같은 자리에 WHAT/WHY 2단을 둔다(WhatWhy). 바깥 격자는 같고 안이 다르다.
+ *
+ * **왜 Bond 만 이 모양인가:** 뱀서라이크는 목표가 하나(GC 최적화)라 'WHY' 한 칸이면 되는데,
+ * Bond 는 목표가 둘(구조 개선 · AI 프로세스 검증)이라 나란히 세워야 했다.
+ * 즉 문서 크기가 모양을 정한 것이지 취향이 아니다 — features 가 배열인 것과 같은 이유다.
+ *
+ * 스키마로 보면 이 카드들이 `overview.why` 다. 데이터 모양이 아니라 렌더링이 갈린 것이다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Goal {
+  /** 파란 배지. 예: 목표 ① */
+  badge: string;
+  /** 배지 옆 제목. 예: 구조 개선 */
+  title: string;
+  body: string;
+}
+
+interface Props {
+  goals: Goal[];
+}
+
+const { goals } = Astro.props;
+
+const CARD = 'border:1px solid rgba(20,22,26,.1);border-radius:12px;padding:16px 17px;background:#fff';
+const BADGE = "font:700 10px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:5px;padding:3px 7px";
+---
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px">
+  {goals.map((g) => (
+    <div style={CARD}>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style={BADGE}>{g.badge}</span><span
+          style="font-size:13.5px;font-weight:800;color:#17181a"
+        >{g.title}</span></div>
+      <div style="font-size:13px;line-height:1.6;color:#44454a" set:html={rich(g.body)} />
+    </div>
+  ))}
+</div>

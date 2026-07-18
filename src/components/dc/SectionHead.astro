@@ -16,12 +16,21 @@ interface Props {
   title: string;
   /** 앵커 id — 사이드바 목차가 이 값으로 건다 */
   id: string;
+  /**
+   * 문서의 첫 섹션인지.
+   *
+   * 원본은 둘째 섹션부터 `margin-top:0` 을 붙인다. 앞에 챕터 구분선이 오는데
+   * 그 구분선이 `margin:74px 0 46px` 을 갖고 있어, 섹션에도 위 여백이 있으면
+   * 둘이 겹쳐 벌어지기 때문이다. 첫 섹션은 앞에 구분선이 없어 그대로 둔다.
+   * 뱀서라이크·Bond 둘 다 같다.
+   */
+  first?: boolean;
 }
 
-const { num, title, id } = Astro.props;
+const { num, title, id, first = false } = Astro.props;
 ---
 
-<section data-section id={id} style="scroll-margin-top:24px">
+<section data-section id={id} style={first ? 'scroll-margin-top:24px' : 'scroll-margin-top:24px;margin-top:0'}>
   <div style="display:flex;align-items:flex-end;gap:16px;margin:0 0 22px">
     <div
       style="font-size:62px;font-weight:800;line-height:.78;color:#17181a;letter-spacing:-.045em;border-bottom:5px solid #2563eb;padding-bottom:5px"

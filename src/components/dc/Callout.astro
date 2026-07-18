@@ -1,0 +1,66 @@
+---
+/**
+ * 콜아웃 — 배지 하나 + 곁가지 이야기.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: 뱀서 `CI · 빌드 자동화`(흰·제목) · Bond `핵심`(파랑) · `주의`(흰·제목없음).
+ *
+ * 본문 흐름에서 한 칸 튀어나와야 하는 곁가지에 쓴다. 본문에 섞으면 묻히고,
+ * 섹션으로 빼면 과한 것들이다.
+ *
+ * **Bond 가 세 조합을 다 드러냈다.** 원본이 tone(배경) × 제목 유무로 갈린다.
+ *   white + 제목  — 흰 배경 + 파란 줄. 배지 + 제목 + 본문(2단). 곁가지 주제를 **소개**한다.
+ *   white + 제목× — 흰 배경 + 파란 줄. 배지 + 본문(1줄). 짧은 **주의**를 던진다.
+ *   tint  + 제목× — 파란 배경(#eef3ff). 배지 + 본문. 이미 아는 것의 **핵심**을 짚는다.
+ * 제목이 있으면 배지가 블록(div)이고, 없으면 인라인(span)이라 배지+본문이 한 줄로 흐른다.
+ * 본문 글자색까지 조금씩 다르다(흔들림) — tone·제목 조합으로 정한다. padding 도 흔들려 prop 이다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** 왼쪽 배지. 짧게. 예: CI · 핵심 · 주의 · Rule */
+  badge: string;
+  /** 흰 배경 + 파란 줄(white)인지, 파란 배경(tint)인지 */
+  tone: 'white' | 'tint';
+  /** 있으면 2단(배지 블록 + 제목 + 본문), 없으면 1줄(배지+본문 인라인) */
+  title?: string;
+  body: string;
+  /** 원본이 이 자리에 박아둔 padding. 예: `15px 17px` · `14px 16px` */
+  padding: string;
+  /** 원본이 이 자리에 박아둔 margin. 예: `18px 0 0` */
+  margin: string;
+}
+
+const { badge, tone, title, body, padding, margin } = Astro.props;
+
+const isWhite = tone === 'white';
+const hasTitle = title !== undefined;
+
+const bg = isWhite
+  ? 'background:#fff;border:1px solid rgba(20,22,26,.1);border-left:3px solid #2563eb'
+  : 'background:#eef3ff;border:1px solid #cddcfb';
+const FRAME = `display:flex;gap:14px;align-items:flex-start;${bg};border-radius:11px;padding:${padding};margin:${margin}`;
+const BADGE = "font:700 10px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:5px;padding:4px 7px;flex:none";
+
+/* 제목 없는 본문의 글자색이 tone 마다 다르다 — 흰은 #44454a/12.5px, 파랑은 #25303f/13px. */
+const BODY_INLINE = isWhite
+  ? 'font-size:12.5px;line-height:1.6;color:#44454a'
+  : 'font-size:13px;line-height:1.62;color:#25303f;text-wrap:pretty';
+---
+
+<div style={FRAME}>
+  {hasTitle ? (
+    <>
+      <div style={BADGE}>{badge}</div>
+      <div><div style="font-size:13.5px;font-weight:700;color:#17181a;margin-bottom:4px">{title}</div><div
+          style="font-size:12.5px;line-height:1.6;color:#55565a"
+          set:html={rich(body)}
+        /></div>
+    </>
+  ) : (
+    <>
+      <span style={BADGE}>{badge}</span>
+      <span style={BODY_INLINE} set:html={rich(body)} />
+    </>
+  )}
+</div>

@@ -1,0 +1,40 @@
+---
+/**
+ * 개요 가운데 — WHAT / WHY 2단. **뱀서라이크가 쓰는 모양이다.**
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `WHAT` / `WHY` 두 칸.
+ *
+ * Bond 는 같은 자리에 **다른 것**을 둔다(요약 문단 + 목표 카드 2장 = GoalCards).
+ * 바깥 격자(`1fr 1fr;gap:14px;margin-bottom:24px`)는 둘이 같은데 안에 든 카드가 딴 물건이다.
+ * 그래서 개요를 Pills + Figure + [가변 가운데] + Tldr 로 쪼갰다.
+ *
+ * WHAT 은 진한 강조선, WHY 는 흐린 강조선이다. 원본이 둘을 구분해 둔 그대로다 —
+ * 무엇을 만들었나(WHAT)보다 왜 만들었나(WHY)가 뒤에 오지만, 강조선의 진하기가
+ * 읽는 순서를 잡아준다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** 지도 — 이 문서가 다루는 것 */
+  what: string;
+  /** 나침반 — 왜 이 문제를 풀었나 */
+  why: string;
+}
+
+const { what, why } = Astro.props;
+
+const LABEL = "font:600 10px 'JetBrains Mono',monospace;letter-spacing:.14em";
+const BODY = 'font-size:14px;line-height:1.62;color:#33343a';
+---
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px">
+  <div style="border-left:3px solid #2563eb;padding:3px 0 3px 15px">
+    <div style={`${LABEL};color:#2563eb;margin-bottom:7px`}>WHAT</div>
+    <div style={BODY} set:html={rich(what)} />
+  </div>
+  <div style="border-left:3px solid rgba(37,99,235,.28);padding:3px 0 3px 15px">
+    <div style={`${LABEL};color:#8a8b90;margin-bottom:7px`}>WHY</div>
+    <div style={BODY} set:html={rich(why)} />
+  </div>
+</div>

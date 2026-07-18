@@ -1,0 +1,216 @@
+---
+/**
+ * 클래스 다이어그램 — 손으로 배치한 UML.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `① 전투 계약 · IFighter` ~ 범례까지의 덩어리(11KB).
+ *
+ * Mermaid 로 그리지 않는 이유는 ClassBox 와 같다 — 자동 배치로는 이 그림이 안 나온다.
+ * 무엇을 위에 두고 무엇을 나란히 놓을지를 사람이 정한 그림이라, 그 판단이 곧 내용이다.
+ *
+ * 원본이 그룹을 두 가지로 그린다.
+ *   inherit — 부모 하나 아래로 자식들을 매단다. 삼각형 + 세로선 + 가로 막대.
+ *             edge 가 `implements` 면 점선, `extends` 면 실선이다. UML 표기 그대로다.
+ *   row     — 상자를 나란히 놓고 사이에 화살표를 둔다. 상속이 아니라 참조 관계.
+ *
+ * 자식은 ClassBox(칸이 있는 큰 상자) 또는 leaf(이름 + 한두 줄짜리 작은 상자)다.
+ * 원본이 스킬 4종만 작은 상자로 그린다 — 넷을 한 줄에 세우려면 큰 상자로는 안 들어간다.
+ */
+import ClassBox from './ClassBox.astro';
+import { escapeHtml, rich } from '../../lib/rich';
+
+/** ClassBox 에 그대로 넘길 값 */
+interface Box {
+  stereotype?: string;
+  name: string;
+  fields?: string[];
+  methods: string[];
+  kind: 'contract' | 'impl';
+  width: number;
+}
+
+/** 작은 잎 상자 — 헤더(이름)와 본문 몇 줄뿐이다 */
+interface Leaf {
+  name: string;
+  /** 가운데 정렬로 쌓이는 줄들 */
+  lines: string[];
+  /**
+   * 색. 원본이 두 가지를 쓴다(Bond 효과 핸들러 그룹이 반증).
+   *   accent — 파랑(#2563eb). 제대로 구현된 것.
+   *   muted  — 흐린 파랑(#93b4f5). 스텁·가드처럼 아직 덜 된 것.
+   */
+  tone?: 'accent' | 'muted';
+}
+
+/** row 그룹에서 상자 사이에 놓는 화살표 */
+interface Arrow {
+  /** 화살표 위에 붙는 말. 예: 큐에 저장 */
+  label: string;
+}
+
+interface Group {
+  /** 그룹 머리. 예: ① 전투 계약 · IFighter */
+  caption: string;
+  kind: 'inherit' | 'row';
+
+  /* --- kind: 'inherit' --- */
+  /** UML 표기. implements 면 점선, extends 면 실선. */
+  edge?: 'implements' | 'extends';
+  parent?: Box;
+  /** 자식 상자들. 큰 상자(Box) 또는 작은 잎(Leaf) 중 하나로 통일된다. */
+  children?: Box[];
+  leaves?: Leaf[];
+  /** 자식 사이 간격. 원본이 그룹마다 다른 값을 준다(44px · 22px · 16px). */
+  gap?: number;
+  /**
+   * 그룹 아래 붙는 캡션 칩. 예: `DI가 IReadOnlyList<...>로 자동 수집 → …`.
+   * Bond 효과 핸들러 그룹이 이걸로 '이 자식들이 어떻게 묶이는지'를 한 줄 설명한다.
+   */
+  chip?: string;
+
+  /* --- kind: 'row' --- */
+  items?: Array<{ box?: Box; arrow?: Arrow }>;
+}
+
+interface Relation {
+  from: { text: string; accent: boolean };
+  /** 화살표 글자 그대로. 예: ◆─▶ (보유) · ─▶ (참조) */
+  glyph: string;
+  to: { text: string; accent: boolean };
+  /** 이 관계가 무엇인지 한마디. 예: 이벤트 발행 */
+  note: string;
+}
+
+interface LegendItem {
+  /** line 이면 삼각형 + 선, arrow 면 글리프 */
+  kind: 'line' | 'arrow';
+  /** kind 가 line 일 때만. 실선이냐 점선이냐. */
+  dashed?: boolean;
+  /** kind 가 arrow 일 때. 원본이 문서마다 다르다 — 뱀서 `─▶`(참조) · Bond `◆─▶`(DI 수집). */
+  glyph?: string;
+  label: string;
+}
+
+interface Props {
+  groups: Group[];
+  /**
+   * 관계 칩 — 그림에 선으로 다 긋기엔 많은 관계를 글로 뽑은 것. 뱀서만 쓴다.
+   * 비면(Bond) 관계 칩 블록도, 그 앞 구분선도 그리지 않는다.
+   */
+  relations?: Relation[];
+  legend: LegendItem[];
+  /**
+   * 범례 래퍼의 여백. 원본이 문서마다 다르다 — 뱀서 `18px 0 0 14px`(top/pad),
+   * Bond `22px 0 0 16px`. 관계 칩 유무에 따라 위 간격을 맞춘 것으로 보인다.
+   */
+  legendMargin: { top: number; pad: number };
+}
+
+const { groups, relations = [], legend, legendMargin } = Astro.props;
+
+/* 원본이 반복하는 style */
+const CAPTION =
+  "text-align:center;font:700 9.5px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#8a8b90;margin-bottom:14px";
+const COL = 'display:flex;flex-direction:column;align-items:center';
+const TRIANGLE =
+  'width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:11px solid #17181a';
+const STEM_DASHED = 'width:0;height:13px;border-left:2px dashed #17181a';
+const STEM_SOLID = 'width:2px;height:13px;background:#17181a';
+/** 자식 쪽 실선 줄기만 파랑이다. 부모 쪽은 검정. */
+const STEM_SOLID_BLUE = 'width:2px;height:13px;background:#2563eb';
+const CHILD_COL = 'display:flex;flex-direction:column;align-items:center;flex:none';
+const CHIP =
+  "display:inline-flex;align-items:center;gap:7px;font:500 10.5px 'JetBrains Mono',monospace;background:#fff;border:1px solid rgba(20,22,26,.12);border-radius:7px;padding:6px 10px";
+const LEGEND_ITEM = "display:inline-flex;align-items:center;gap:7px;font:500 10px 'JetBrains Mono',monospace;color:#8a8b90";
+const LEGEND_TRI =
+  'display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #17181a';
+---
+
+<div style="border:1px solid rgba(20,22,26,.1);border-radius:14px;background:#fbfbfa;padding:24px 20px 20px;margin:14px 0 12px">
+  {groups.map((g, gi) => (
+    <>
+      {/* 그룹 사이 가로줄. 첫 그룹 위에는 없다. */}
+      {gi > 0 && <div style="height:1px;background:rgba(20,22,26,.09);margin:26px 0"></div>}
+
+      <div style={CAPTION}>{g.caption}</div>
+
+      {g.kind === 'inherit' ? (
+        <>
+        <div style={COL}>
+          <ClassBox {...g.parent!} />
+          <div style={TRIANGLE}></div><div style={g.edge === 'implements' ? STEM_DASHED : STEM_SOLID}></div>
+          {/*
+            자식 막대 — 선 종류는 edge(implements=점선 · extends=실선)가,
+            스크롤 옵션은 **자식 종류**가 정한다. leaf 는 작은 상자를 여럿 한 줄에 세우므로
+            넘칠 때 가로 스크롤(nowrap·overflow-x·padding-bottom)이 붙고, 큰 Box 자식은 안 붙는다.
+            처음엔 edge 로만 갈랐는데, Bond 의 '점선 + leaf' 조합이 반증했다.
+          */}
+          <div
+            style={`border-top:2px ${g.edge === 'implements' ? 'dashed' : 'solid'} #17181a;display:flex;gap:${g.gap}px;justify-content:center;${(g.leaves ?? []).length > 0 ? 'flex-wrap:nowrap;overflow-x:auto;max-width:100%;padding-bottom:2px' : 'max-width:100%'}`}
+          >
+            {(g.children ?? []).map((c) => (
+              <div style={CHILD_COL}><div style={g.edge === 'implements' ? STEM_DASHED : STEM_SOLID_BLUE}></div><ClassBox {...c} /></div>
+            ))}
+            {(g.leaves ?? []).map((leaf) => {
+              const muted = leaf.tone === 'muted';
+              const leafBorder = muted ? '#93b4f5' : '#2563eb';
+              const leafShadow = muted ? '0 2px 7px rgba(37,99,235,.1)' : '0 2px 7px rgba(37,99,235,.13)';
+              const leafBody = muted ? '#8a8b90' : '#55565a';
+              return (
+                <div style={CHILD_COL}><div style={g.edge === 'implements' ? STEM_DASHED : STEM_SOLID_BLUE}></div><div
+                  style={`border:1.5px solid ${leafBorder};border-radius:7px;overflow:hidden;background:#fff;box-shadow:${leafShadow}`}
+                ><div style={`background:${leafBorder};padding:6px 9px;text-align:center;font:700 10px 'JetBrains Mono',monospace;color:#fff`}>{leaf.name}</div><div
+                    style={`padding:6px 9px;font:500 9px/1.5 'JetBrains Mono',monospace;color:${leafBody};text-align:center`}
+                    set:html={leaf.lines.map(escapeHtml).join('<br>')}
+                  /></div></div>
+              );
+            })}
+          </div>
+        </div>
+        {/* 캡션 칩은 COL **밖**에 온다 — 자식 막대 아래 별도 줄이다. 원본이 그렇다. */}
+        {g.chip !== undefined && (
+          <div style="text-align:center;margin-top:14px"><span
+              style="display:inline-block;font:500 10.5px 'JetBrains Mono',monospace;color:#55565a;background:#fff;border:1px solid rgba(20,22,26,.12);border-radius:7px;padding:6px 11px"
+              set:html={rich(g.chip)}
+            /></div>
+        )}
+        </>
+      ) : (
+        <div style="display:flex;gap:16px;justify-content:center;align-items:center;flex-wrap:wrap">
+          {(g.items ?? []).map((it) => (
+            it.box !== undefined
+              ? <ClassBox {...it.box} />
+              : <div style="display:flex;flex-direction:column;align-items:center;color:#93b4f5;font:600 9px 'JetBrains Mono',monospace"><span style="color:#8a8b90;margin-bottom:2px">{it.arrow!.label}</span><span style="font-size:16px;color:#93b4f5">▶</span></div>
+          ))}
+        </div>
+      )}
+    </>
+  ))}
+
+  {/*
+    관계 칩 — 뱀서만 쓴다. 그림에 선으로 다 긋기엔 많은 관계를 글로 뽑은 것.
+    Bond 는 관계를 그림 안에서 다 보여서 이 블록도, 그 앞 구분선도 없다.
+  */}
+  {relations.length > 0 && (
+    <>
+      <div style="height:1px;background:rgba(20,22,26,.09);margin:24px 0 18px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        {relations.map((r) => (
+          <span style={CHIP}><b style={r.from.accent ? 'color:#1d4ed8;font-weight:700' : 'color:#17181a;font-weight:700'}>{r.from.text}</b>{' '}<span
+              style="color:#93b4f5"
+            >{r.glyph}</span>{' '}<b style={r.to.accent ? 'color:#1d4ed8' : 'color:#17181a'}>{r.to.text}</b><span style="color:#8a8b90">{r.note}</span></span>
+        ))}
+      </div>
+    </>
+  )}
+
+  <div style={`display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-top:${legendMargin.top}px;padding-top:${legendMargin.pad}px;border-top:1px dashed rgba(20,22,26,.14)`}>
+    {legend.map((l) => (
+      l.kind === 'line'
+        ? <span style={LEGEND_ITEM}><span style={LEGEND_TRI}></span>{' '}<span
+            style={l.dashed === true ? 'border-top:2px dashed #17181a;width:20px;display:inline-block' : 'border-top:2px solid #17181a;width:20px;display:inline-block'}
+          ></span>{' '}{l.label}</span>
+        : <span style={LEGEND_ITEM}><span style="color:#93b4f5;font-size:13px">{l.glyph}</span>{' '}{l.label}</span>
+    ))}
+  </div>
+</div>

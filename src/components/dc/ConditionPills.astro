@@ -1,0 +1,26 @@
+---
+/**
+ * 측정 조건 알약 — 표 아래에 붙는 회색 꼬리표.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `테스트: 스폰딜레이 0.1s · 체력 1000 고정` 줄.
+ *
+ * 개요의 알약(Overview 안 pills)과 다르다. 저쪽은 파랑 · 반경 20px 이고 이쪽은
+ * 회색 · 반경 5px 이다. 수치를 어떤 조건에서 쟀는지는 자랑이 아니라 각주라서
+ * 원본이 눈에 덜 띄게 그렸다. 조건 없는 수치는 근거가 못 되므로 빼지는 않는다.
+ */
+interface Props {
+  items: string[];
+  /** 원본이 이 자리에 박아둔 margin-bottom. 예: `6px` */
+  marginBottom: string;
+}
+
+const { items, marginBottom } = Astro.props;
+
+const PILL =
+  "font:500 10.5px 'JetBrains Mono',monospace;color:#55565a;background:#f2f2f0;border:1px solid rgba(20,22,26,.1);border-radius:5px;padding:4px 8px";
+---
+
+<div style={`display:flex;gap:6px;flex-wrap:wrap;margin-bottom:${marginBottom}`}>
+  {items.map((x) => <span style={PILL}>{x}</span>)}
+</div>

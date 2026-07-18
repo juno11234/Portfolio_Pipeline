@@ -13,9 +13,25 @@ interface Props {
   /** 배지에 들어갈 말. 짧게. 예: 기술 스택 · 핵심 동작 · EDITOR TOOL */
   badge: string;
   title: string;
+  /**
+   * 원본이 h3 마다 직접 박아둔 margin 값. 예: `44px 0 6px`
+   *
+   * **원본에 5가지가 있어서 뺄 수밖에 없었다.** 처음엔 `0 0 4px` 하나로 박아뒀는데,
+   * 그 값은 뱀서라이크 h3 19개 중 **1개**(sec-1 첫 h3)에만 해당하는 예외였다.
+   * 하필 그 하나만 보고 컴포넌트를 떠서 나머지 18개가 전부 어긋나 있었다.
+   *
+   *   0 0 4px    — 섹션 01 첫 h3 (요약 상자 바로 아래라 붙인다)
+   *   36px/44px  — 섹션 02·03 의 첫 h3 / 나머지 h3
+   *   34px/40px  — 섹션 04·05 의 첫 h3 / 나머지 h3
+   *
+   * 34↔36 과 40↔44 는 같은 자리인데 값만 다르다. 원본의 흔들림이지 의도가 아니다.
+   * 그래도 여기서 임의로 통일하지 않는다 — 디자인은 claude.ai/design 이 원본이고,
+   * 고칠 거면 거기서 고쳐 다시 떠 온다. 지금은 원본을 그대로 재현한다.
+   */
+  margin: string;
 }
 
-const { badge, title } = Astro.props;
+const { badge, title, margin } = Astro.props;
 ---
 
 {/*
@@ -23,6 +39,6 @@ const { badge, title } = Astro.props;
   공백까지 있어야 원본과 같은 간격이 된다. Astro 는 태그 사이 개행을 지우므로
   {' '} 로 명시해야 한다. 없으면 배지와 제목이 딱 붙는다.
 */}
-<h3 style="display:flex;align-items:center;gap:10px;margin:0 0 4px;font-size:17px;font-weight:800;color:#17181a"><span
+<h3 style={`display:flex;align-items:center;gap:10px;margin:${margin};font-size:17px;font-weight:800;color:#17181a`}><span
     style="font:700 10px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:5px;padding:3px 8px"
   >{badge}</span>{' '}{title}{' '}</h3>

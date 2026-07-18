@@ -1,0 +1,54 @@
+---
+/**
+ * 수식 + 그 수식이 만드는 값의 표 — 나란히.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `경험치 · 레벨업 곡선` 덩어리.
+ *
+ * 수식만 적으면 곡선이 얼마나 가파른지 안 와닿고, 표만 있으면 왜 그 숫자인지 모른다.
+ * 원본이 둘을 나란히 둔 이유다. 표는 오른쪽 열이 숫자라 오른쪽 정렬이다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** 파란 상자 안 수식. 예: RequiredExp = baseRequiredExp × level × 1.5 */
+  formula: string;
+  /** 수식 아래 잔글씨 */
+  note: string;
+  /** 표 머리 두 칸. 왼쪽·오른쪽. */
+  headers: [string, string];
+  /** 표 행. 왼쪽 칸 · 오른쪽 칸 · 오른쪽 칸 뒤에 붙는 흐린 괄호말. */
+  rows: Array<{ left: string; right: string; hint?: string }>;
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { formula, note, headers, rows, margin } = Astro.props;
+
+/*
+ * 원본이 반복하는 style.
+ *
+ * 오른쪽 칸은 `text-align:right` 가 **font-family 앞에** 온다. 원본의 속성 순서 그대로다.
+ * 화면에는 영향이 없지만 여기서 순서를 바꾸면 대조가 깨진다 — 그러면 다음 사람이
+ * "원본과 같다"는 말을 믿을 수 없게 된다. 순서까지 맞춰야 대조가 값어치를 갖는다.
+ */
+const TH_BASE = "font:600 10px 'JetBrains Mono',monospace;color:#8a8b90;padding:8px 10px;border-bottom:1.5px solid rgba(20,22,26,.16)";
+const TD_PAD = 'padding:8px 10px;border-bottom:1px solid rgba(20,22,26,.07)';
+const MONO = "font-family:'JetBrains Mono',monospace";
+---
+
+<div style={`display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:${margin}`}>
+  <div style="flex:1;min-width:240px"><div
+      style="background:#eef3ff;border:1px solid #cddcfb;border-radius:9px;padding:12px 14px;font:600 12px 'JetBrains Mono',monospace;color:#1d4ed8"
+    >{formula}</div><div style="font-size:12px;color:#55565a;margin-top:8px;line-height:1.55" set:html={rich(note)} /></div>
+  <table style="flex:1;min-width:200px;border-collapse:collapse;font-size:12.5px">
+    <thead><tr><th style={`text-align:left;${TH_BASE}`}>{headers[0]}</th><th style={`text-align:right;${TH_BASE}`}>{headers[1]}</th></tr></thead>
+    <tbody>
+      {rows.map((r) => (
+        <tr><td style={`${TD_PAD};${MONO};color:#17181a`}>{r.left}</td><td style={`${TD_PAD};text-align:right;${MONO};color:#44454a`}>{r.right}{r.hint !== undefined && (
+          <>{' '}<span style="color:#a0a1a6">{r.hint}</span></>
+        )}</td></tr>
+      ))}
+    </tbody>
+  </table>
+</div>

@@ -148,12 +148,31 @@ const codeBlock = z.object({
   })).min(1),
 });
 
-/** 제목 + 설명 카드 여러 개. 두 문서 모두 3~4개씩 늘어놓는다. */
+/**
+ * 제목 + 설명 카드 여러 개. 두 문서 모두 3~4개씩 늘어놓는다.
+ *
+ * 세 디자인의 '카드 격자'가 여섯 모양(번호·흰·체크·미니·흐름·결함)이지만 담는 데이터는
+ * 전부 제목+설명 하나다. 모양이 다른 것은 렌더링이라 variant 로 받고, 데이터층은 하나로 둔다.
+ * "검사할 규칙이 없고 모양만 다르면 하나로 묶는다" 는 원칙 그대로다.
+ */
 const pointsBlock = z.object({
   type: z.literal('points'),
+  /**
+   *   plain    — 흰 카드 (기본)
+   *   numbered — 큰 파란 번호 (설계 원칙 · 만족스러운 부분)
+   *   check    — 동그란 ✓ (적용 목록)
+   *   mini     — 작은 가운데정렬 (자료구조 3종)
+   *   flow     — 화살표로 이은 가로 흐름 (에이전트 단계)
+   *   defect   — 코드 배지 세로 목록 (리뷰 결함 · 아쉬웠던 점)
+   */
+  variant: z.enum(['plain', 'numbered', 'check', 'mini', 'flow', 'defect']).default('plain'),
+  /** 몇 열로 세울지. 원본이 2·3열을 쓴다. */
+  columns: z.union([z.literal(2), z.literal(3)]).default(3),
   items: z.array(z.object({
     title: z.string().min(1),
     body: z.string().min(1),
+    /** defect 의 코드 배지(B1), mini 의 부제 등 카드에 딸리는 짧은 꼬리표. */
+    tag: z.string().min(1).optional(),
   })).min(2),
 });
 
@@ -174,6 +193,14 @@ const stackTableBlock = z.object({
  */
 const tableBlock = z.object({
   type: z.literal('table'),
+  /**
+   * 셀 스타일. 데이터(headers·rows)는 같고 색만 다르다.
+   *   plain   — 기본 (뱀서 무기 표 · Soul MVVM 표)
+   *   weight  — 0 값은 흐리게, Config 값은 파랑 (Bond 가중치 표)
+   *   channel — 둘째 열이 모노 파랑 코드 타입 (Bond 정적 채널 표)
+   * 셀 색이 규칙(0=흐림·Cfg=파랑)이라 렌더러가 값에서 유도한다. 콘텐츠는 값만 적는다.
+   */
+  variant: z.enum(['plain', 'weight', 'channel']).default('plain'),
   headers: z.array(z.string().min(1)).min(2),
   rows: z.array(z.array(z.string()).min(2)).min(1),
 });
@@ -213,8 +240,15 @@ const layersBlock = z.object({
     items: z.array(z.object({
       name: z.string().min(1),
       note: z.string().optional(),
-      /** 이 문서에서 설명하려는 핵심 객체 하나를 강조한다 */
+      /**
+       * 노드 성격. 강조(파랑)·점선(런타임에 없는 것)·보통. 없으면 emphasis 로 판단한다.
+       * Bond 의 `EventEffectHandler ×4`(dashed) 처럼 emphasis 만으로 안 되는 경우가 있어 열었다.
+       */
+      kind: z.enum(['normal', 'dashed', 'emphasis']).optional(),
+      /** 이 문서에서 설명하려는 핵심 객체 하나를 강조한다 (kind 의 옛 형태) */
       emphasis: z.boolean().default(false),
+      /** 있으면 알약이 아니라 카드로 그린다(이름 + 이 설명 한 줄). Bond 스테이지 스코프. */
+      body: z.string().optional(),
     })).min(1),
   })).min(2),
 });
@@ -300,6 +334,64 @@ const beforeAfterBlock = z.object({
 });
 
 /**
+ * 사용법 목록 — 클래스별로 시그니처와 반환/동작을 나란히.
+ *
+ * 가이드 ③: "어떤 함수를 호출하고 무엇을 입력하면 무엇이 나오는지."
+ * 시그니처만 적고 끝내지 못하게 **반환 설명을 필수**로 둔다 — 이게 이 블록을 따로 두는 이유(규칙).
+ * 세 문서 모두 이 목록을 쓴다(뱀서 DataManager API · Soul timeScale 3중 장치).
+ */
+const apiListBlock = z.object({
+  type: z.literal('api-list'),
+  groups: z.array(z.object({
+    /** 클래스·주제 이름. 예: DataManager */
+    name: z.string().min(1),
+    entries: z.array(z.object({
+      signature: z.string().min(1),
+      /** 무엇이 나오는지. 비우지 못한다. */
+      returns: z.string().min(1),
+    })).min(1),
+  })).min(1),
+});
+
+/**
+ * 콜아웃 — 본문 흐름에서 한 칸 튀어나오는 곁가지(주의·핵심·규칙).
+ *
+ * 가이드가 강제하는 규칙은 없다. 다만 본문에 섞으면 묻히고 섹션으로 빼면 과한 한마디를
+ * 담는 자리라 별도 블록으로 둔다. 세 문서에 걸쳐 15회 넘게 쓰여 반복이 확실하다.
+ */
+const calloutBlock = z.object({
+  type: z.literal('callout'),
+  /** 왼쪽 배지. 짧게. 예: CI · 핵심 · 주의 · Rule */
+  badge: z.string().min(1),
+  /** white=흰 배경+파란 줄 · tint=파란 배경 */
+  tone: z.enum(['white', 'tint']).default('white'),
+  /** 있으면 제목+본문 2단, 없으면 배지+본문 한 줄. */
+  title: z.string().min(1).optional(),
+  body: z.string().min(1),
+});
+
+/**
+ * 상태·흐름 알약 — 라벨을 화살표로 이은 한 줄.
+ *
+ * mermaid stateDiagram 으로도 되지만, 짧은 인라인 가로 흐름은 알약이 더 읽힌다.
+ * 분기가 생기거나 그래프가 커지면 mermaid 를 쓴다 — 여기는 단방향 한 줄 전용이다.
+ */
+const chipsBlock = z.object({
+  type: z.literal('chips'),
+  /** state=상태전이 · loop=개발 루프 · flow=데이터 흐름 · condition=측정 조건 */
+  variant: z.enum(['state', 'loop', 'flow', 'condition']).default('state'),
+  items: z.array(z.object({
+    label: z.string().min(1),
+    /** 알약 색으로 상태 성격을 준다. start=시작 · current=현재 · dead=끝(빨강) */
+    tone: z.enum(['plain', 'start', 'current', 'dead']).default('plain'),
+    /** 이 알약 뒤 화살표. 마지막 알약에는 없다. 예: → · ⟳ */
+    arrow: z.string().min(1).optional(),
+  })).min(2),
+  /** 오른쪽 끝에 미는 빨간 주석 알약. 예: 형제 경로 → Locked 영구 */
+  tail: z.string().min(1).optional(),
+});
+
+/**
  * 자기소개서.
  *
  * 프로젝트와 달리 **하나뿐인 글**이라 반복 구조를 만들지 않았다.
@@ -359,8 +451,15 @@ function makeDocBlock(image: ImageFn) {
     type: z.literal('image'),
     src: image(),
     caption: z.string().min(1),
-    /** 이미지 위에 붙는 라벨 (예: SCREENSHOT · PROFILER) */
+    /** 이미지 위에 붙는 라벨 (예: SCREENSHOT · PROFILER · EDITOR TOOL) */
     label: z.string().min(1).default('SCREENSHOT'),
+    /**
+     * 배치. below=캡션이 아래(기본) · aside=캡션이 옆(폭 좁은 에디터 화면).
+     * 캡션 위치가 다를 뿐 데이터는 같아 variant 로 받는다.
+     */
+    variant: z.enum(['below', 'aside']).default('below'),
+    /** aside 일 때 그림 폭(px). 이미지 실제 크기라 콘텐츠가 정한다. 예: 330 */
+    width: z.number().int().positive().optional(),
   });
 
   return z.discriminatedUnion('type', [
@@ -374,6 +473,9 @@ function makeDocBlock(image: ImageFn) {
     beforeAfterBlock,
     imageBlock,
     mermaidBlock,
+    apiListBlock,
+    calloutBlock,
+    chipsBlock,
   ]);
 }
 
@@ -405,6 +507,11 @@ const mermaidBlock = z.object({
  */
 function partSchema(image: ImageFn) {
   return z.object({
+    /**
+     * 파란 배지. 디자인의 PartTitle 은 배지(무엇에 대한 이야기 — 기술 스택·구성요소·관계)와
+     * 제목(그 안에서 무슨 판단)을 나눈다. 없으면 제목만 h3 로 낸다.
+     */
+    badge: z.string().min(1).optional(),
     title: z.string().min(1),
     /** 제목 아래 한 줄 설명. 두 디자인 모두 거의 모든 꼭지에 달고 있다. */
     lede: z.string().optional(),
@@ -435,12 +542,28 @@ const projectDocs = defineCollection({
      *
      * 네 항목을 따로 받는 이유는, 한 문단으로 뭉치면 what만 쓰고 why를 빠뜨리기 때문이다.
      * 가이드의 아쉬운 예가 정확히 그것이다 — "인벤토리 시스템을 만들었습니다"(왜 만들었나?).
+     *
+     * **가운데가 문서마다 다르다** — 세 디자인이 반증했다(뱀서 WHAT/WHY · Bond 요약+목표카드 ·
+     * Soul 요약+WHAT/WHY). 그래서 조각을 optional 로 두되, superRefine 에서 **(what·why 2단)
+     * 또는 (goals 목표카드) 중 하나는 반드시 있게** 강제한다. '무엇을·왜'를 빠뜨리는 것은 못 막는 게
+     * 아니라, 두 형식 중 하나로 반드시 담게 하는 것이다. evidence·scope 는 형식과 무관하게 필수.
      */
     overview: z.object({
-      /** 지도 — 이 문서가 다루는 것 */
-      what: z.string().min(1),
+      /** 대표 화면 아래 요약 한 문단. Bond·Soul 이 쓴다. 없어도 된다. */
+      lead: z.string().min(1).optional(),
+      /** 지도 — 이 문서가 다루는 것. why 와 짝으로 WHAT/WHY 2단이 된다. */
+      what: z.string().min(1).optional(),
       /** 나침반 — 왜 이 문제를 풀었나 */
-      why: z.string().min(1),
+      why: z.string().min(1).optional(),
+      /**
+       * 목표 카드. WHAT/WHY 2단 대신 개요 가운데를 목표 N장으로 채운다(Bond).
+       * what/why 와 목표 카드는 같은 '무엇을·왜'를 다른 형식으로 담은 것이다.
+       */
+      goals: z.array(z.object({
+        badge: z.string().min(1),
+        title: z.string().min(1),
+        body: z.string().min(1),
+      })).min(1).optional(),
       /**
        * 증거 — 측정된 문제.
        * 가이드: "'느리다' 대신 '로딩 15초'처럼 측정 가능한 문제로."
@@ -490,6 +613,8 @@ const projectDocs = defineCollection({
      */
     architecture: z.object({
       title: z.string().default('시스템 구조'),
+      /** 섹션 헤더 바로 아래 한 문단(첫 꼭지 앞). Bond·Soul 이 쓴다. 없어도 된다. */
+      intro: z.string().min(1).optional(),
       parts: z.array(partSchema(image)).min(1),
     }),
 
@@ -505,6 +630,8 @@ const projectDocs = defineCollection({
      */
     features: z.array(z.object({
       title: z.string().min(1),
+      /** 섹션 헤더 바로 아래 한 문단(첫 꼭지 앞). 없어도 된다. */
+      intro: z.string().min(1).optional(),
       parts: z.array(partSchema(image)).min(1),
       /**
        * ④ 고민과 선택 — 이 기능을 만들며 내린 판단.
@@ -536,23 +663,45 @@ const projectDocs = defineCollection({
      * debt와 plan을 필수로 둔 것이 이 스키마에서 가장 중요한 판단이다.
      * 가이드: "'아쉬운 점 없습니다'는 0점. 기술 부채를 인지하고 개선을 제시하는 사람이
      * 성장 가능성을 인정받습니다."
+     *
+     * **회고 서술도 문서마다 다르다** — 세 디자인이 반증했다(뱀서 결과·트러블슈팅 · Bond 대조·통찰
+     * 카드 · Soul 만족·데이터·빌드). 그래서 서술은 features 처럼 자유 `parts` 로 열되,
+     * **debt·plan(부채·계획)만은 형식과 무관하게 필수로 남긴다.** 이게 게이트다 —
+     * 화려한 서술은 자유롭게, "아쉬운 점과 그래서 어떻게" 는 반드시.
      */
     retrospective: z.object({
-      /** 목표 달성 여부를 데이터로. 가이드: "'빨라졌다'가 아니라 '15초가 3초가 됐다'" */
-      results: z.array(z.string().min(1)).min(1),
-      /** 무엇이 문제였고 원인이 무엇이었나 */
+      /** 목표 달성을 데이터로. Bond 처럼 수치 결과가 없는 문서는 생략 가능. */
+      results: z.array(z.string().min(1)).min(1).optional(),
+      /** 무엇이 문제였고 원인이 무엇이었나 (뱀서식 정형 트러블슈팅) */
       troubleshooting: z.array(z.object({
         problem: z.string().min(1),
         cause: z.string().min(1),
         fix: z.string().min(1),
         lesson: z.string().min(1),
       })).default([]),
+      /** 자유 서술 꼭지. Bond 잘한점(대조·통찰), Soul 만족·데이터·빌드 등. 꼭지 모양은 본문과 같다. */
+      parts: z.array(partSchema(image)).default([]),
       /** 남은 기술 부채. 비워둘 수 없다. */
       debt: z.array(z.string().min(1)).min(1),
       /** 그래서 다음엔 어떻게 할 것인가. 부채만 적고 계획이 없으면 반쪽이다. */
       plan: z.array(z.string().min(1)).min(1),
     }),
   }).superRefine((doc, ctx) => {
+    /*
+     * 개요 가운데는 형식이 둘이다 — (what·why 2단) 또는 (goals 목표카드).
+     * 형식은 자유롭게 고르되 '무엇을·왜'를 빠뜨리는 것은 막는다. 둘 다 없으면 게이트가 잡는다.
+     */
+    const hasWhatWhy = doc.overview.what !== undefined && doc.overview.why !== undefined;
+    const hasGoals = doc.overview.goals !== undefined && doc.overview.goals.length > 0;
+    if (hasWhatWhy === false && hasGoals === false) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          '개요에 what·why 2단도 goals 목표카드도 없습니다. 이 문서가 무엇을·왜 만들었는지를 ' +
+          '둘 중 한 형식으로는 반드시 밝혀야 합니다.',
+      });
+    }
+
     /*
      * 결정은 기능 안에 있어도 되고(Bond) 따로 모아도 된다(뱀서라이크).
      * 어디에 있든 **문서 전체에 하나도 없으면 안 된다.**
@@ -573,8 +722,8 @@ const projectDocs = defineCollection({
     }
     all.forEach(([where, d], i) => checkDecision(d, `${where} #${i + 1}`, ctx));
 
-    /* 표의 열 개수 검사 — ②·③ 모든 꼭지를 훑는다 */
-    const groups = [doc.architecture, ...doc.features];
+    /* 표의 열 개수 검사 — ②·③ 꼭지와 회고 자유 꼭지를 모두 훑는다 */
+    const groups = [doc.architecture, ...doc.features, { title: '결과·회고', parts: doc.retrospective.parts }];
     for (const g of groups) {
       for (const part of g.parts) {
         for (const block of part.blocks) {

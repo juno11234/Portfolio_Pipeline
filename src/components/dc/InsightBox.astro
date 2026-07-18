@@ -1,0 +1,44 @@
+---
+/**
+ * 통찰 상자 — 파란 배경에 제목 + 3열 항목 + 아래 '알게된 점' 바.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `VContainer 스코프 상속 — 직접 실험으로 검증` 덩어리.
+ *
+ * LessonCard(회고의 troubleshooting)와 닮았지만 아래에 **구분선 + 알게된 점 바**가 더 붙는다.
+ * 3열은 '무엇을 실험으로 확인했나'(Singleton·Scoped·재등록)를 늘어놓고, 바가 그 결론을 맺는다.
+ * 가이드: "AI 가 못 하는 것: '왜' — 내 실제 의사결정." 직접 실험해 알아낸 것을 남기는 자리다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Item {
+  /** 작은 회색 라벨. 예: Singleton */
+  label: string;
+  body: string;
+}
+
+interface Props {
+  /** 파란 머리. 예: VContainer 스코프 상속 — 직접 실험으로 검증하고 md로 팀에 공유 */
+  title: string;
+  items: Item[];
+  /** 아래 바. 예: **알게된 점** — … */
+  footer: string;
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { title, items, footer, margin } = Astro.props;
+---
+
+<div style={`border:1px solid #cddcfb;background:#eef3ff;border-radius:13px;padding:18px 20px;margin:${margin}`}>
+  <div style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#2563eb;margin-bottom:12px">{title}</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+    {items.map((it) => (
+      <div><div style="font-size:11px;font-weight:700;color:#8a8b90;margin-bottom:4px">{it.label}</div><div
+          style="font-size:12.5px;line-height:1.55;color:#25303f"
+          set:html={rich(it.body)}
+        /></div>
+    ))}
+  </div>
+  <div style="margin-top:13px;padding-top:12px;border-top:1px solid #cddcfb;font-size:12.5px;line-height:1.6;color:#25303f" set:html={rich(footer)} />
+</div>

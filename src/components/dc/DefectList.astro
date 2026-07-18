@@ -1,0 +1,45 @@
+---
+/**
+ * 결함 목록 — 코드 배지(B1·B2·B3) + 제목 + 설명 카드를 세로로 쌓는다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `정적 분석이 리뷰 단계에서 잡은 결함 3건` 덩어리.
+ *
+ * 가이드 ⑤: "'아쉬운 점 없습니다'는 0점." 리뷰가 실제로 무엇을 잡았는지 번호를 달아
+ * 보이는 자리다. 각 항목이 '무엇이(제목) 왜 문제인가(본문)'를 갖춰 막연한 회고를 막는다.
+ *
+ * Callout · PlanList 와 겉이 닮았지만 배지가 **네모 코드 배지**(B1)이고 여럿을 세로로
+ * 쌓는 점이 다르다. 배지에 결함 번호를 넣어 본문에서 "B2 참조"처럼 가리킬 수 있다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Defect {
+  /** 코드 배지. 예: B1 */
+  code: string;
+  title: string;
+  body: string;
+}
+
+interface Props {
+  defects: Defect[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0 4px` */
+  margin: string;
+}
+
+const { defects, margin } = Astro.props;
+
+const CARD = 'display:flex;gap:13px;align-items:flex-start;border:1px solid rgba(20,22,26,.1);border-radius:11px;padding:14px 16px;background:#fff';
+const BADGE = "font:700 11px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:6px;padding:5px 8px;flex:none";
+---
+
+<div style={`display:flex;flex-direction:column;gap:10px;margin:${margin}`}>
+  {defects.map((d) => (
+    <div style={CARD}>
+      <span style={BADGE}>{d.code}</span>
+      <div><div style="font-size:13px;font-weight:700;color:#17181a;margin-bottom:3px">{d.title}</div><div
+          style="font-size:12px;line-height:1.55;color:#55565a"
+          set:html={rich(d.body)}
+        /></div>
+    </div>
+  ))}
+</div>

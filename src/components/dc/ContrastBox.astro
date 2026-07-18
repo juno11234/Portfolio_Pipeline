@@ -1,0 +1,53 @@
+---
+/**
+ * 과거 vs 현재 — 두 칸에 목록을 나란히 놓아 '무엇이 바뀌었나'를 보인다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `과거 vs 현재 — 구조가 바뀐 지점` 덩어리.
+ *
+ * BeforeAfter(텍스처 전/후)와 다르다 — 저쪽은 이미지 비교이고 이쪽은 **글 목록** 비교다.
+ * 왼쪽(과거)은 회색, 오른쪽(현재)은 연파랑. 성장의 before/after 를 색으로 가른다.
+ * 가이드 ⑤: 회고는 배운 점을 다음 사람이 쓸 수 있게 남긴다. '전에는 이랬는데 지금은 이렇다'가
+ * 가장 정직한 형태다.
+ *
+ * 각 칸 본문은 `<br>` 로 줄을 잇는다. 줄 안에 `**굵게**` 를 쓸 수 있어 rich() 를 거친다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Side {
+  /** 칸 머리. 예: 과거 팀 프로젝트 · 현재 팀 프로젝트 */
+  label: string;
+  /** 항목들. 각 줄 앞의 `· ` 는 여기서 붙인다. */
+  items: string[];
+}
+
+interface Props {
+  /** 왼쪽(과거) — 회색 */
+  past: Side;
+  /** 오른쪽(현재) — 연파랑 */
+  now: Side;
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0` */
+  margin: string;
+}
+
+const { past, now, margin } = Astro.props;
+
+const LABEL_GRAY = "font:700 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#8a8b90;margin-bottom:10px";
+const LABEL_BLUE = "font:700 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#2563eb;margin-bottom:10px";
+
+/** `· 항목` 을 <br> 로 이어 한 덩어리로 만든다. 각 항목은 rich() 를 거친다. */
+const joinItems = (items: string[]): string => items.map((it) => `· ${rich(it)}`).join('<br>');
+---
+
+<div style={`border:1px solid rgba(20,22,26,.12);border-radius:14px;overflow:hidden;margin:${margin}`}>
+  <div style="display:grid;grid-template-columns:1fr 1fr">
+    <div style="padding:15px 17px;background:#fafafa;border-right:1px solid rgba(20,22,26,.08)">
+      <div style={LABEL_GRAY}>{past.label}</div>
+      <div style="font-size:12.5px;line-height:1.7;color:#55565a" set:html={joinItems(past.items)} />
+    </div>
+    <div style="padding:15px 17px;background:#f8faff">
+      <div style={LABEL_BLUE}>{now.label}</div>
+      <div style="font-size:12.5px;line-height:1.7;color:#33343a" set:html={joinItems(now.items)} />
+    </div>
+  </div>
+</div>

@@ -1,0 +1,50 @@
+---
+/**
+ * 기술 부채 표 — 항목(모노) · 상태.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `기술 부채 · 정의되어 있으나 런타임 미사용` 표.
+ *
+ * 가이드 ⑤: "'아쉬운 점 없습니다'는 0점. 기술 부채를 인지하고 개선을 제시하는 사람이
+ * 성장 가능성을 인정받습니다." 그래서 스키마도 retrospective.debt 를 필수로 둔다.
+ *
+ * DataTable 과 다르다 — 첫 열이 굵은 글씨가 아니라 **모노**다. 항목이 전부 코드에
+ * 실재하는 이름(StatLevelUp · JobType.Mage)이라 그렇다. 칸 여백(10px 12px)도 다르다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** 두 칸. 예: 항목 · 상태 */
+  headers: [string, string];
+  /** 첫 칸은 모노로 찍히는 식별자, 둘째 칸은 지금 어떤 상태인지 */
+  rows: Array<{ item: string; state: string }>;
+  /** 원본이 첫 열에 준 폭. 예: 240 */
+  firstWidth: number;
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { headers, rows, firstWidth, margin } = Astro.props;
+
+/* 원본이 칸마다 반복하는 style */
+const TH =
+  "text-align:left;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#8a8b90;text-transform:uppercase;padding:9px 12px;border-bottom:1.5px solid rgba(20,22,26,.16)";
+const TD = 'padding:10px 12px;border-bottom:1px solid rgba(20,22,26,.07)';
+---
+
+<table style={`width:100%;border-collapse:collapse;margin:${margin};font-size:12.5px`}>
+  <thead>
+    <tr>
+      <th style={`${TH};width:${firstWidth}px`}>{headers[0]}</th>
+      <th style={TH}>{headers[1]}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows.map((r) => (
+      <tr>
+        <td style={`${TD};font-family:'JetBrains Mono',monospace;color:#17181a`}>{r.item}</td>
+        <td style={`${TD};color:#44454a`} set:html={rich(r.state)} />
+      </tr>
+    ))}
+  </tbody>
+</table>

@@ -1,0 +1,66 @@
+---
+/**
+ * 사용법 목록 — 클래스별로 시그니처와 반환/동작을 나란히 세운다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `사용법 (API) · 무엇을 호출하면 무엇이 나오는가` 덩어리.
+ *
+ * 가이드 ③: "어떤 함수를 호출하고 무엇을 입력하면 무엇이 나오는지."
+ * 시그니처 폭을 230px 로 고정해 설명이 세로로 줄 맞는다. 눈이 왼쪽 열만 훑어도
+ * 무엇을 부를 수 있는지 보이고, 오른쪽은 필요할 때만 읽게 된다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Entry {
+  /** 호출부 한 줄. 예: GetPlayerStat(int id) */
+  signature: string;
+  /** 무엇이 나오는지. 예: PlayerStat 반환 · 실패 시 LogError 후 null */
+  returns: string;
+}
+
+interface Group {
+  /** 클래스 이름. 예: DataManager */
+  name: string;
+  entries: Entry[];
+}
+
+interface Props {
+  groups: Group[];
+  /**
+   * 왼쪽 시그니처 열 폭. 원본이 흔들린다 — 뱀서 API 목록 230 · Bond 3중 장치 210.
+   * 이 열이 세로로 줄 맞는 게 이 목록의 요점이라 값으로 받는다.
+   */
+  sigWidth: number;
+  /** 첫 그룹 머리의 아래 여백. 원본이 흔들린다 — 뱀서 4px · Bond 6px. */
+  firstHeadPadBottom: number;
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` · `14px 0 0` */
+  margin: string;
+}
+
+const { groups, sigWidth, firstHeadPadBottom, margin } = Astro.props;
+
+/* 원본이 반복하는 style */
+const HEAD = "font:600 9.5px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#a0a1a6";
+const SIG = `flex:none;width:${sigWidth}px;font:600 11.5px 'JetBrains Mono',monospace;color:#1d4ed8`;
+---
+
+<div style={`border:1px solid rgba(20,22,26,.1);border-radius:12px;background:#fff;padding:6px 16px;margin:${margin}`}>
+  {groups.map((g, gi) => (
+    <>
+      {/*
+        첫 그룹 머리는 위 여백만, 둘째부터는 가로줄을 얹고 여백을 조금 더 준다.
+        그룹이 바뀌는 지점을 줄 하나로 알리는 것 — 원본 그대로다.
+      */}
+      <div style={gi === 0 ? `${HEAD};padding:12px 0 ${firstHeadPadBottom}px` : `${HEAD};padding:14px 0 4px;border-top:1px solid rgba(20,22,26,.06)`}>{g.name}</div>
+      {g.entries.map((e, ei) => (
+        <div
+          style={
+            ei === g.entries.length - 1
+              ? 'display:flex;gap:12px;padding:9px 0'
+              : 'display:flex;gap:12px;padding:9px 0;border-bottom:1px solid rgba(20,22,26,.06)'
+          }
+        ><code style={SIG}>{e.signature}</code><span style="font-size:12.5px;color:#55565a" set:html={rich(e.returns)} /></div>
+      ))}
+    </>
+  ))}
+</div>

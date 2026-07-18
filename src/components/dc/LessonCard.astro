@@ -1,0 +1,52 @@
+---
+/**
+ * 배운 점 카드 — 제목 아래 세 칸(무엇이 문제였나 · 원인 · 알게된 점).
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `① 평균이 아니라 스파이크를 제거하는 것` ·
+ * `② 텍스처 압축도 트레이드오프의 대상` 두 덩어리.
+ *
+ * 가이드 ⑤: 회고는 "'다 만들었다'는 선언이 아니다." 세 칸이 강제되어 있어
+ * 문제만 적고 끝내거나 원인 없이 해결만 적는 것을 막는다. 스키마의
+ * retrospective.troubleshooting(problem·cause·fix·lesson)이 노리는 것과 같다.
+ *
+ * 원본이 두 가지로 그린다.
+ *   tint  — 파란 배경. 이 문서의 핵심 깨달음(GC 스파이크) 하나에만 쓴다.
+ *   plain — 흰 배경 + 왼쪽 파란 줄. 나머지.
+ * 둘을 나란히 두면 어느 쪽이 더 중요한 이야기인지 색만 보고 안다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Cell {
+  /** 칸 머리. 예: 의문점 · 원인 · Boehm GC · 알게된 점 */
+  label: string;
+  body: string;
+}
+
+interface Props {
+  /** 예: ① 평균이 아니라 스파이크를 제거하는 것 */
+  title: string;
+  kind: 'tint' | 'plain';
+  cells: Cell[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { title, kind, cells, margin } = Astro.props;
+
+const isTint = kind === 'tint';
+const FRAME = isTint
+  ? `border:1px solid #cddcfb;background:#eef3ff;border-radius:13px;padding:18px 20px;margin:${margin}`
+  : `border:1px solid rgba(20,22,26,.1);background:#fff;border-left:3px solid #2563eb;border-radius:13px;padding:18px 20px;margin:${margin}`;
+/* 본문 글자색만 두 종류에서 다르다 */
+const BODY = isTint ? 'font-size:12.5px;line-height:1.55;color:#25303f' : 'font-size:12.5px;line-height:1.55;color:#33343a';
+---
+
+<div style={FRAME}>
+  <div style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#2563eb;margin-bottom:12px">{title}</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+    {cells.map((c) => (
+      <div><div style="font-size:11px;font-weight:700;color:#8a8b90;margin-bottom:4px">{c.label}</div><div style={BODY} set:html={rich(c.body)} /></div>
+    ))}
+  </div>
+</div>

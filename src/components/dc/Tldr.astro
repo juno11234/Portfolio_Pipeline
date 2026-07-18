@@ -1,0 +1,29 @@
+---
+/**
+ * 10초 요약 — 개요 맨 아래 파란 상자.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: 두 문서의 `▶ 10초 요약 — 이 문서가 증명하는 것` 상자.
+ *
+ * 가이드 Part 2 ①: "결론부터 제시해 10초 안에 핵심이 잡혀야 합니다."
+ * 두 문서 모두 같은 자리에 같은 모양으로 두고 있다. 개요의 가운데는 서로 다른데
+ * 이 상자만은 같다 — 문서가 무엇을 증명하는지 먼저 못박는 것은 크기와 무관하기 때문이다.
+ *
+ * 원래 Overview.astro 안에 있었는데 Bond 를 올려보고 쪼갰다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** 상자 머리. 예: ▶ 10초 요약 — 이 문서가 증명하는 것 */
+  label: string;
+  /** 본문. `**굵게**` 와 `` `코드` `` 를 쓸 수 있다. */
+  body: string;
+}
+
+const { label, body } = Astro.props;
+---
+
+<div style="background:#eef3ff;border:1px solid #cddcfb;border-radius:13px;padding:20px 22px;margin-bottom:30px">
+  <div style="font:600 10px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#2563eb;margin-bottom:9px">{label}</div>
+  <div style="font-size:14.5px;line-height:1.68;color:#25303f;text-wrap:pretty" set:html={rich(body)} />
+</div>

@@ -1,0 +1,28 @@
+---
+/**
+ * 개요 리드 문단 — 대표 화면 바로 아래 오는 한 문단. **Bond 가 쓴다.**
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 figure 뒤 `절차적으로 생성되는 노드 맵…` 문단.
+ *
+ * 본문 lede(Lede.astro)와 값이 다르다 — 이쪽은 `max-width:680px;font-size:14.5px;
+ * line-height:1.68;color:#33343a;text-wrap:pretty` 이고, 저쪽은 660px/13.5px 회색이다.
+ * 개요에서 문서 전체를 한 문단으로 소개하는 자리라 본문 설명글보다 크고 진하다.
+ *
+ * 뱀서라이크에는 이 문단이 없다 — 개요 가운데를 WHAT/WHY 2단으로 처리하기 때문이다.
+ * Bond 는 요약 문단(이것) + 목표 카드(GoalCards)로 나눠 담는다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** `**굵게**` 와 `` `코드` `` 를 쓸 수 있다. */
+  text: string;
+}
+
+const { text } = Astro.props;
+---
+
+<p
+  style="margin:0 0 22px;max-width:680px;font-size:14.5px;line-height:1.68;color:#33343a;text-wrap:pretty"
+  set:html={rich(text)}
+/>

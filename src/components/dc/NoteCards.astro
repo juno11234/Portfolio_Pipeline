@@ -1,0 +1,59 @@
+---
+/**
+ * 카드 격자 — 모노 파란 제목 + 설명.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `그 밖의 결정 · 힙 할당을 없애기 위한 선택들`(2열)과
+ * `적용 · GC 최적화 6가지`(2열, 체크 표시).
+ *
+ * '카드 격자'로 보이는 것이 원본에 셋 있지만 셋 다 다른 컴포넌트다.
+ *   NoteCards      — 2열. 모노 파란 제목 + 본문.        (그 밖의 결정)
+ *   PrincipleCards — 3열. 22px 짜리 큰 번호 + 제목.      (설계 원칙)
+ *   CheckCards     — 2열. 동그란 ✓ 를 왼쪽에 세운 flex.  (GC 최적화 6가지)
+ * 여백·반경·글자 크기가 전부 다르다. 처음엔 이 컴포넌트에 옵션을 붙여 CheckCards 를
+ * 겸하려 했는데, 원본과 대조해 보니 속 구조부터 달라서 갈랐다.
+ * 겉보기에 같아 보인다고 합치면 셋 중 둘이 원본과 어긋난다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Card {
+  title: string;
+  body: string;
+}
+
+interface Props {
+  cards: Card[];
+  /**
+   * 열 수. 2 는 `1fr 1fr`, 3 은 `repeat(3,1fr)` 로 낸다 — 원본이 같은 뜻을 두 문법으로 쓴다.
+   * 뱀서 '그 밖의 결정' 2열 · Bond '턴 시스템 특성' 3열.
+   */
+  columns: 2 | 3;
+  /** 원본이 이 자리에 박아둔 gap. 예: 12 · 10 */
+  gap: number;
+  /**
+   * 카드 안쪽 padding · 본문 글자 크기 · 본문 line-height. 원본이 문서마다 흔들린다 —
+   * 뱀서 `14px 16px`/12.5px/1.55 · Bond 턴특성 `14px 15px`/12px/1.55 · Bond 셰이더 `13px 14px`/11.5px/1.5.
+   * 값으로 받아 원본을 그대로 재현한다. 여기서 통일하지 않는다 — 고칠 거면 디자인에서.
+   */
+  cardPad: string;
+  bodyFont: string;
+  bodyLh: string;
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0 4px` */
+  margin: string;
+}
+
+const { cards, columns, gap, cardPad, bodyFont, bodyLh, margin } = Astro.props;
+
+const cols = columns === 2 ? '1fr 1fr' : 'repeat(3,1fr)';
+const CARD = `border:1px solid rgba(20,22,26,.1);border-radius:11px;padding:${cardPad};background:#fff`;
+const TITLE = "font:700 11px 'JetBrains Mono',monospace;color:#1d4ed8;margin-bottom:5px";
+---
+
+<div style={`display:grid;grid-template-columns:${cols};gap:${gap}px;margin:${margin}`}>
+  {cards.map((c) => (
+    <div style={CARD}><div style={TITLE}>{c.title}</div><div
+        style={`font-size:${bodyFont};line-height:${bodyLh};color:#55565a`}
+        set:html={rich(c.body)}
+      /></div>
+  ))}
+</div>

@@ -1,0 +1,45 @@
+---
+/**
+ * 루프 알약 — 알약을 화살표로 이어 한 줄로 두고 마지막에 ⟳ 로 되돈다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `스크립트가 아니라 계획 파일을 고친다` 덩어리.
+ *
+ * StateChips(적 생명주기)와 뼈대가 같지만 값이 다르다 — 컨테이너가 **가운데 정렬**이고
+ * (justify-content:center), 알약이 더 크다(11px · padding 8px 12px · radius 7px vs
+ * StateChips 10.5px · 5px 9px · 6px). 순환하는 개발 루프라 한가운데 크게 세운 것이다.
+ * 겉이 비슷하다고 StateChips 에 합쳤으면 저쪽 알약 크기가 어긋났을 것이다.
+ *
+ * 첫 알약만 파랑(시작점), 나머지는 회색이다. 마지막 화살표는 ⟳(되돌아감).
+ */
+interface Step {
+  label: string;
+  /** 이 알약 **뒤** 화살표. 마지막 알약엔 없다. 예: → · ⟳ */
+  arrow?: string;
+  /** ⟳ 처럼 되돌아가는 화살표는 색이 더 흐리다(#c2c3c8). 보통 화살표는 #93b4f5. */
+  arrowLoop?: boolean;
+}
+
+interface Props {
+  steps: Step[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { steps, margin } = Astro.props;
+
+const CHIP_START = "font:600 11px 'JetBrains Mono',monospace;color:#1d4ed8;background:#eef3ff;border:1px solid #cddcfb;border-radius:7px;padding:8px 12px";
+const CHIP = "font:600 11px 'JetBrains Mono',monospace;color:#26272b;background:#fff;border:1px solid rgba(20,22,26,.12);border-radius:7px;padding:8px 12px";
+---
+
+<div
+  style={`display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;padding:18px;border:1px solid rgba(20,22,26,.1);border-radius:12px;background:#fff;margin:${margin}`}
+>
+  {steps.map((s, i) => (
+    <>
+      <span style={i === 0 ? CHIP_START : CHIP}>{s.label}</span>{s.arrow !== undefined && (
+        <span style={s.arrowLoop === true ? 'color:#c2c3c8;font-weight:700' : 'color:#93b4f5;font-weight:700'}>{s.arrow}</span>
+      )}
+    </>
+  ))}
+</div>

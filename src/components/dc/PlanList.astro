@@ -1,0 +1,35 @@
+---
+/**
+ * 개선 계획 — 번호 + 한 줄짜리 항목을 세로로 쌓는다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `개선 계획 · 다음 스텝` 덩어리.
+ *
+ * 가이드 ⑤: 부채만 적고 계획이 없으면 반쪽이다. 스키마가 retrospective.plan 을
+ * 필수로 두는 이유이고, 그래서 이 블록은 부채 표 바로 뒤에 온다.
+ * 항목마다 '무엇을' 굵게 + '어떻게' 를 붙이는 형식을 원본이 지키고 있다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** 각 항목. `**굵게**` 와 `` `코드` `` 를 쓸 수 있다. 번호는 순번으로 붙는다. */
+  items: string[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0 4px` */
+  margin: string;
+}
+
+const { items, margin } = Astro.props;
+
+const ROW =
+  'display:flex;gap:12px;align-items:flex-start;border:1px solid rgba(20,22,26,.1);border-radius:10px;padding:13px 15px;background:#fff';
+const NUM = "font:700 11px 'JetBrains Mono',monospace;color:#2563eb;flex:none";
+---
+
+<div style={`display:flex;flex-direction:column;gap:9px;margin:${margin}`}>
+  {items.map((x, i) => (
+    <div style={ROW}><span style={NUM}>{String(i + 1).padStart(2, '0')}</span><div
+        style="font-size:13px;line-height:1.55;color:#33343a"
+        set:html={rich(x)}
+      /></div>
+  ))}
+</div>

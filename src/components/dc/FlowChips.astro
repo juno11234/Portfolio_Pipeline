@@ -1,0 +1,36 @@
+---
+/**
+ * 흐름 알약 — 알약을 화살표로 이어 한 줄, 마지막 칸을 파랑으로 강조.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `Playables 커스텀 트랙 — 4계층`(Track→Clip→Behaviour→Mixer).
+ *
+ * StateChips · LoopChips 와 chips 계열이지만 값이 다 다르다 — 억지로 합치면 지저분해진다.
+ *   StateChips — 상태 전이. 시작(파랑)·보통(회색)·현재·사망(빨강), 배경 흰색.
+ *   LoopChips  — 개발 루프. 첫 칸 강조, ⟳ 로 되돔, padding 8px 12px.
+ *   FlowChips  — 데이터 흐름. **끝 칸** 강조(도착지가 요점), 배경 #fbfbfa, padding 7px 11px.
+ * 강조 위치·배경·여백·화살표가 제각각이다. 겉이 닮았다고 합치면 셋 중 둘이 어긋난다.
+ */
+interface Props {
+  /** 알약 라벨들. 마지막 칸이 파랑으로 강조된다. */
+  steps: string[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { steps, margin } = Astro.props;
+
+const CHIP = "font:600 11px 'JetBrains Mono',monospace;color:#26272b;background:#fff;border:1px solid rgba(20,22,26,.12);border-radius:7px;padding:7px 11px";
+const CHIP_LAST = "font:600 11px 'JetBrains Mono',monospace;color:#1d4ed8;background:#eef3ff;border:1px solid #cddcfb;border-radius:7px;padding:7px 11px";
+---
+
+<div
+  style={`display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;padding:16px;border:1px solid rgba(20,22,26,.1);border-radius:12px;background:#fbfbfa;margin:${margin}`}
+>
+  {steps.map((s, i) => (
+    <>
+      {i > 0 && <span style="color:#93b4f5;font-weight:700">→</span>}
+      <span style={i === steps.length - 1 ? CHIP_LAST : CHIP}>{s}</span>
+    </>
+  ))}
+</div>

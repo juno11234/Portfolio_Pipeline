@@ -1,0 +1,29 @@
+---
+/**
+ * 챕터 구분선 — 섹션과 섹션 **사이**에 오는 줄.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `CHAPTER 02 / 05` 덩어리(뱀서라이크 4개 · Bond 6개).
+ *
+ * 섹션 **안**이 아니라 밖에 있어서 처음 구조를 훑을 때 통째로 놓쳤다.
+ * `<section>` 안만 뒤지는 스크립트로는 안 잡힌다.
+ *
+ * `aria-hidden` 이 붙어 있다. 화면에 '몇 장 중 몇 장'을 보이려는 장식이고,
+ * 그 정보는 이미 섹션 번호(SECTION 02)가 말해준다. 스크린리더에 두 번 읽히면 소음이다.
+ * 원본이 그렇게 해뒀고, 맞는 판단이라 그대로 뒀다.
+ */
+interface Props {
+  /** 이 구분선 **다음**에 오는 섹션 번호. '02' 처럼 두 자리로 넘긴다. */
+  num: string;
+  /** 문서의 전체 섹션 수. '05' 처럼 두 자리로 넘긴다. */
+  total: string;
+}
+
+const { num, total } = Astro.props;
+---
+
+<div aria-hidden="true" style="display:flex;align-items:center;gap:18px;margin:74px 0 46px">
+  <div style="width:7px;height:7px;border-radius:50%;background:#2563eb"></div>
+  <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(37,99,235,.4),rgba(20,22,26,.07))"></div>
+  <span style="font:700 10px 'JetBrains Mono',monospace;letter-spacing:.2em;color:#a0a1a6">CHAPTER {num} / {total}</span>
+</div>

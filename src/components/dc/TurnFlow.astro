@@ -1,0 +1,80 @@
+---
+/**
+ * 턴 흐름 — 진입 박스 두 개 → 파란 루프 박스(2×2 단계) → 종료 박스.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `속도 내림차순 큐를 소진하는 다층 루프` 덩어리.
+ *
+ * 손으로 배치한 그림이라 Mermaid 로는 같은 모양이 안 나온다(ClassBox·Layers 와 같은 이유).
+ * 위는 진입점(SwitchBattle → StartBattleAsync), 가운데는 while 루프가 도는 파란 상자,
+ * 아래는 종료(BattleEnd)다. 루프가 파랑인 것은 이 그림에서 실제로 반복되는 부분이 거기라서다.
+ *
+ * 이 문서에만 나오는 모양이라 값을 넉넉히 받는다. 다른 프로젝트에서 비슷한 게 나오면
+ * 그때 공통을 추린다 — 지금 미리 일반화하면 두 번째 사례가 또 반증한다.
+ */
+interface Step {
+  /** 단계 이름. 예: PrepareTurnQueue */
+  name: string;
+  note: string;
+  /** 파란 강조 이름인지. 예: await TakeTurnAsync() */
+  accent?: boolean;
+}
+
+interface Entry {
+  name: string;
+  /** 이름 뒤에 붙는 회색 잔글씨. 예: SwitchBattle 뒤의 '토글' */
+  sub?: string;
+}
+
+interface Props {
+  /** 맨 위 진입 박스들. 화살표(▶)로 이어진다. */
+  entries: Entry[];
+  /** 파란 루프 박스 머리. 예: 전투 루프 — while(_isBattleActive) · … */
+  loopLabel: string;
+  /** 루프 안 맨 위 파란 띠. 예: PlayRoundAsync — 1 라운드 */
+  loopHead: string;
+  /** 루프 안 2열 그리드 단계들 */
+  steps: Step[];
+  /** 맨 아래 종료 박스. 예: BattleEnd — CTS 취소 전파 */
+  exit: string;
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0` */
+  margin: string;
+}
+
+const { entries, loopLabel, loopHead, steps, exit, margin } = Astro.props;
+
+const NODE = "font:700 11px 'JetBrains Mono',monospace;color:#26272b;background:#fff;border:1px solid rgba(20,22,26,.14);border-radius:8px;padding:8px 12px;box-shadow:0 1px 4px rgba(20,22,26,.08)";
+const V_ARROW = 'width:1px;height:12px;background:#93b4f5;margin:6px auto 0';
+const V_TRI = 'width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #93b4f5;margin:0 auto 8px';
+const H_TRI = 'width:0;height:0;border-top:5px solid transparent;border-bottom:5px solid transparent;border-left:7px solid #93b4f5';
+const STEP_BOX = 'border:1px solid rgba(20,22,26,.12);border-radius:8px;padding:10px 12px;background:#fff';
+---
+
+<div style="border:1px solid rgba(20,22,26,.1);border-radius:14px;background:#fff;padding:18px;margin:16px 0">
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
+    {entries.map((e, i) => (
+      <>
+        {i > 0 && <div style={H_TRI}></div>}
+        <span style={NODE}>{e.name}{e.sub !== undefined && (
+          <>{' '}<span style="color:#8a8b90;font-weight:500">{e.sub}</span></>
+        )}</span>
+      </>
+    ))}
+  </div>
+
+  <div style={V_ARROW}></div><div style={V_TRI}></div>
+
+  <div style="border:1px solid #cddcfb;border-radius:11px;background:#f8faff;padding:12px 14px">
+    <div style="font:600 9.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#2563eb;margin-bottom:9px">{loopLabel}</div>
+    <div style="text-align:center;background:#2563eb;border-radius:8px;padding:9px;font:700 12px 'JetBrains Mono',monospace;color:#fff;margin-bottom:10px">{loopHead}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      {steps.map((s) => (
+        <div style={STEP_BOX}><div style={`font:700 11px 'JetBrains Mono',monospace;color:${s.accent === true ? '#1d4ed8' : '#17181a'};margin-bottom:2px`}>{s.name}</div><div style="font-size:11px;line-height:1.45;color:#6b6b6b">{s.note}</div></div>
+      ))}
+    </div>
+  </div>
+
+  <div style="width:1px;height:12px;background:#93b4f5;margin:8px auto 0"></div><div style={V_TRI}></div>
+
+  <div style="text-align:center"><span style={NODE}>{exit}</span></div>
+</div>

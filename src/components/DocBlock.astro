@@ -1,445 +1,210 @@
 ---
 /**
- * 기술 문서 블록 하나를 그린다.
+ * 기술 문서 블록 하나를 **dc 컴포넌트로** 그린다.
  *
- * 형태는 claude.ai/design 의 "VamSirLike Document" 를 따른다.
- * 원본 PDF에서는 이 내용들이 72ppi 래스터 이미지에 묻혀 검색도 복사도 안 됐다. 여기서는 전부 텍스트다.
+ * 스키마 블록(데이터층)을 받아 알맞은 dc 컴포넌트(템플릿층)에 넘긴다.
+ * 스키마와 dc 의 모양이 어긋나는 곳은 여기서 어댑터로 잇는다 —
+ * 예: 스키마 code 의 api → dc Code 의 source, table 의 string[][] → DataTable 의 {label,cells}.
+ *
+ * variant 필드가 같은 데이터를 여러 컴포넌트 중 하나로 보낸다(points·table·image·chips).
+ * 그래프(class-diagram 등)는 스키마에 없다 — 전부 mermaid 로 온다.
+ *
+ * 여백은 여기서 **블록 종류별 규칙**으로 준다(디자인의 자리별 값이 아니라). 콘텐츠 파일은
+ * 여백을 들지 않는다 — 3층 분리를 지키는 지점이다.
  */
-import type { CollectionEntry } from 'astro:content';
-import { Image } from 'astro:assets';
 import { renderMermaid } from '../lib/mermaid';
 import { rich } from '../lib/rich';
 
-type Doc = CollectionEntry<'projectDocs'>['data'];
-type Block = Doc['sections'][number]['parts'][number]['blocks'][number];
+import Code from './dc/Code.astro';
+import StackTable from './dc/StackTable.astro';
+import DataTable from './dc/DataTable.astro';
+import WeightTable from './dc/WeightTable.astro';
+import ChannelTable from './dc/ChannelTable.astro';
+import MetricsTable from './dc/MetricsTable.astro';
+import Layers from './dc/Layers.astro';
+import PrincipleCards from './dc/PrincipleCards.astro';
+import CheckCards from './dc/CheckCards.astro';
+import MiniCards from './dc/MiniCards.astro';
+import FlowCards from './dc/FlowCards.astro';
+import DefectList from './dc/DefectList.astro';
+import Figure from './dc/Figure.astro';
+import FigureAside from './dc/FigureAside.astro';
+import ApiList from './dc/ApiList.astro';
+import Callout from './dc/Callout.astro';
+import StateChips from './dc/StateChips.astro';
+import LoopChips from './dc/LoopChips.astro';
+import FlowChips from './dc/FlowChips.astro';
+import ConditionPills from './dc/ConditionPills.astro';
+import ContrastBox from './dc/ContrastBox.astro';
 
+// 블록 유니온이 넓어 정확한 타입을 매기기 번거롭다. 판별자(type)로 좁혀 읽으므로 unknown 으로 받는다.
 interface Props {
-  block: Block;
+  block: Record<string, unknown>;
 }
-
 const { block } = Astro.props;
+const b = block as any;
 
 /* 빌드 시점에 SVG로 굽는다. 브라우저로 나가는 JS는 0이다. */
-const mermaidSvg = block.type === 'mermaid' ? await renderMermaid(block.source) : null;
+const mermaidSvg = b.type === 'mermaid' ? await renderMermaid(b.source) : null;
+
+/** points variant → dc 카드 컴포넌트로 넘길 값을 만든다. */
+const cardItems = b.type === 'points' ? b.items : [];
 ---
 
-{block.type === 'mermaid' && mermaidSvg !== null && (
-  <figure class="dia">
-    <div class="dia-body" set:html={mermaidSvg} />
-    <figcaption>
-      <span class="dia-label">DIAGRAM</span>
-      {block.question}
-    </figcaption>
-  </figure>
-)}
-
-{block.type === 'image' && (
-  <figure class="shot">
-    <Image src={block.src} alt={block.caption} widths={[720, 1440]} sizes="(max-width: 860px) 100vw, 720px" />
-    <figcaption>
-      <span class="slabel">{block.label}</span>
-      {block.caption}
-    </figcaption>
-  </figure>
-)}
-
-{block.type === 'prose' && (
+{b.type === 'prose' && (
   <div class="prose">
-    {block.paragraphs.map((p) => <p set:html={rich(p)} />)}
+    {b.paragraphs.map((p: string) => <p set:html={rich(p)} />)}
   </div>
 )}
 
-{block.type === 'code' && (
-  <div class="code">
-    <p class="api"><span>사용법</span><code>{block.api}</code></p>
-    <div class="scroll">
-      <pre><code>{block.code}</code></pre>
-    </div>
+{b.type === 'code' && (
+  <div class="code-wrap">
+    <Code source={b.api} code={b.code} margin="16px 0 0" />
     <ul class="notes">
-      {block.notes.map((n) => (
-        <li>
-          <span class="at">{n.at}</span>
-          <span class="why" set:html={rich(n.why)} />
-        </li>
+      {b.notes.map((n: { at: string; why: string }) => (
+        <li><span class="at">{n.at}</span><span class="why" set:html={rich(n.why)} /></li>
       ))}
     </ul>
   </div>
 )}
 
-{block.type === 'points' && (
-  <ul class="points">
-    {block.items.map((item) => (
-      <li>
-        <h4>{item.title}</h4>
-        <p set:html={rich(item.body)} />
-      </li>
-    ))}
-  </ul>
+{b.type === 'points' && b.variant === 'numbered' && (
+  <PrincipleCards margin="16px 0 4px" cards={cardItems.map((it: any, i: number) => ({ num: it.tag ?? String(i + 1).padStart(2, '0'), title: it.title, body: it.body }))} />
+)}
+{b.type === 'points' && b.variant === 'check' && (
+  <CheckCards margin="16px 0 4px" cards={cardItems.map((it: any) => ({ title: it.title, body: it.body }))} />
+)}
+{b.type === 'points' && b.variant === 'mini' && (
+  <MiniCards margin="14px 0" cards={cardItems.map((it: any) => ({ name: it.title, note: it.body }))} />
+)}
+{b.type === 'points' && b.variant === 'flow' && (
+  <FlowCards margin="16px 0 4px" arrow="→" cards={cardItems.map((it: any) => ({ label: it.tag ?? '', title: it.title, body: it.body }))} />
+)}
+{b.type === 'points' && b.variant === 'defect' && (
+  <DefectList margin="16px 0 4px" defects={cardItems.map((it: any, i: number) => ({ code: it.tag ?? `B${i + 1}`, title: it.title, body: it.body }))} />
+)}
+{/* plain(기본) — 잉크 제목 카드. 번호 없는 PrincipleCards 로 낸다. */}
+{b.type === 'points' && (b.variant === undefined || b.variant === 'plain') && (
+  <PrincipleCards margin="16px 0 4px" cards={cardItems.map((it: any) => ({ title: it.title, body: it.body }))} />
 )}
 
-{block.type === 'stack-table' && (
-  <div class="scroll">
-    <table class="tbl">
-      <thead>
-        <tr><th>분류</th><th>기술</th><th>사용 목적</th></tr>
-      </thead>
-      <tbody>
-        {block.rows.map((row) => (
-          <tr>
-            <td class="cat">{row.category}</td>
-            <td class="tech">{row.tech}</td>
-            <td set:html={rich(row.purpose)} />
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
+{b.type === 'stack-table' && (
+  <div class="scroll"><StackTable rows={b.rows} widths={[118, 180]} /></div>
 )}
 
-{block.type === 'table' && (
-  <div class="scroll">
-    <table class="tbl">
-      <thead>
-        <tr>{block.headers.map((h) => <th>{h}</th>)}</tr>
-      </thead>
-      <tbody>
-        {block.rows.map((row) => (
-          <tr>{row.map((cell, i) => <td class={i === 0 ? 'tech' : undefined}>{cell}</td>)}</tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
+{b.type === 'table' && b.variant === 'weight' && (
+  <div class="scroll"><WeightTable margin="16px 0 4px" headers={b.headers} rows={b.rows.map((r: string[]) => ({
+    cond: r[0],
+    cells: r.slice(1).map((c: string) => ({ text: c, tone: /^0(\.0+)?$/.test(c) ? 'zero' : (c === 'Cfg' ? 'cfg' : 'normal') })),
+  }))} /></div>
+)}
+{b.type === 'table' && b.variant === 'channel' && (
+  <div class="scroll"><ChannelTable margin="6px 0 8px" headers={b.headers} rows={b.rows.map((r: string[]) => ({ name: r[0], type: r[1], direction: r[2] }))} /></div>
+)}
+{b.type === 'table' && (b.variant === undefined || b.variant === 'plain') && (
+  <div class="scroll"><DataTable margin="14px 0" headers={b.headers} rows={b.rows.map((r: string[]) => ({ label: r[0], cells: r.slice(1) }))} /></div>
 )}
 
-{block.type === 'layers' && (
-  <div class="layers">
+{b.type === 'layers' && (
+  <div class="layers-wrap">
     <dl class="triplet">
-      <div><dt>구성요소</dt><dd set:html={rich(block.components)} /></div>
-      <div><dt>관계</dt><dd set:html={rich(block.relations)} /></div>
-      <div><dt>흐름</dt><dd set:html={rich(block.flow)} /></div>
+      <div><dt>구성요소</dt><dd set:html={rich(b.components)} /></div>
+      <div><dt>관계</dt><dd set:html={rich(b.relations)} /></div>
+      <div><dt>흐름</dt><dd set:html={rich(b.flow)} /></div>
     </dl>
-
-    {block.layers.map((layer) => (
-      <>
-        {layer.edge !== undefined && (
-          <p class="edge"><span>{layer.edge}</span></p>
-        )}
-        <div class="layer">
-          <div class="layer-head">
-            <span class="layer-name">{layer.name}</span>
-            {layer.note !== undefined && <span class="layer-note">{layer.note}</span>}
-          </div>
-          <div class="nodes">
-            {layer.items.map((item) => (
-              <div class:list={['node', { 'is-emphasis': item.emphasis === true }]}>
-                <span class="node-name">{item.name}</span>
-                {item.note !== undefined && <span class="node-note">{item.note}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </>
-    ))}
+    <Layers
+      headTracking=".08em"
+      layers={b.layers.map((L: any) => ({
+        name: L.name,
+        note: L.note ?? '',
+        edge: L.edge,
+        items: L.items.map((it: any) => ({
+          name: it.name,
+          kind: it.kind ?? (it.emphasis === true ? 'emphasis' : 'normal'),
+          body: it.body,
+        })),
+      }))}
+    />
   </div>
 )}
 
-{block.type === 'metrics' && (
-  <ul class="metrics">
-    {block.items.map((m) => (
-      <li>
-        <p class="mlabel">{m.label}</p>
-        <p class="mvals tnum">
-          <span class="before">{m.before}</span>
-          <span class="arrow" aria-hidden="true">→</span>
-          <span class="after">{m.after}</span>
-          <span class="delta">{m.delta}</span>
-        </p>
-      </li>
-    ))}
-  </ul>
+{b.type === 'metrics' && (
+  <MetricsTable margin="14px 0 10px" headers={['지표', '최적화 전', '최적화 후', '개선']} rows={b.items} />
 )}
 
-{block.type === 'before-after' && (
-  <div class="ba">
-    <div class="ba-cols">
-      {[block.before, block.after].map((side, i) => (
-        <div class:list={['ba-col', { 'is-after': i === 1 }]}>
-          <h4>{side.label}</h4>
-          <ul>{side.items.map((t) => <li set:html={rich(t)} />)}</ul>
-        </div>
-      ))}
-    </div>
-    <p class="lesson"><span>알게된 점</span>{block.lesson}</p>
-  </div>
+{b.type === 'before-after' && (
+  <ContrastBox
+    margin="16px 0"
+    past={{ label: b.before.label, items: b.before.items }}
+    now={{ label: b.after.label, items: b.after.items }}
+  />
+)}
+
+{b.type === 'image' && b.variant === 'aside' && (
+  <FigureAside src={b.src.src} alt={b.caption} width={b.width ?? 330} background="#2b2b2b" label={b.label} caption={b.caption} size="sm" margin="18px 0 4px" />
+)}
+{b.type === 'image' && (b.variant === undefined || b.variant === 'below') && (
+  <Figure src={b.src.src} alt={b.caption} kind="body" background="#fff" label={b.label} caption={b.caption} margin="18px 0 6px" />
+)}
+
+{b.type === 'mermaid' && mermaidSvg !== null && (
+  <figure class="dia">
+    <div class="dia-body" set:html={mermaidSvg} />
+    <figcaption><span class="dia-label">DIAGRAM</span>{b.question}</figcaption>
+  </figure>
+)}
+
+{b.type === 'api-list' && (
+  <ApiList margin="14px 0" sigWidth={230} firstHeadPadBottom={4} groups={b.groups} />
+)}
+
+{b.type === 'callout' && (
+  <Callout badge={b.badge} tone={b.tone} title={b.title} body={b.body} padding="15px 17px" margin="18px 0 0" />
+)}
+
+{b.type === 'chips' && b.variant === 'loop' && (
+  <LoopChips margin="14px 0" steps={b.items} />
+)}
+{b.type === 'chips' && b.variant === 'flow' && (
+  <FlowChips margin="14px 0" steps={b.items.map((it: any) => it.label)} />
+)}
+{b.type === 'chips' && b.variant === 'condition' && (
+  <ConditionPills marginBottom="6px" items={b.items.map((it: any) => it.label)} />
+)}
+{b.type === 'chips' && (b.variant === undefined || b.variant === 'state') && (
+  <StateChips steps={b.items} tail={b.tail} />
 )}
 
 <style>
-  /* 좁은 화면에서 표만 옆으로 밀리게 한다. 페이지 전체가 밀리면 안 된다. */
   .scroll { overflow-x: auto; }
 
-  /* ---------- Mermaid 다이어그램 ---------- */
-  .dia {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  /* 넓은 다이어그램은 이 안에서만 밀린다. 페이지 전체가 밀리면 안 된다. */
-  .dia-body { overflow-x: auto; padding: 20px 18px; }
-  .dia-body :global(svg) { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-  .dia figcaption {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 10px 14px 12px;
-    border-top: 1px solid var(--line);
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--ink-faint);
-  }
-  .dia-label {
-    flex: none;
-    font: 700 8.5px var(--mono);
-    letter-spacing: .14em;
-    color: #fff;
-    background: var(--accent);
-    border-radius: 4px;
-    padding: 3px 6px;
-  }
-
-  /* ---------- 스크린샷 ---------- */
-  .shot {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .shot img { width: 100%; height: auto; display: block; }
-  .shot figcaption {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 10px 14px 12px;
-    border-top: 1px solid var(--line);
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--ink-faint);
-  }
-  .slabel {
-    flex: none;
-    font: 700 8.5px var(--mono);
-    letter-spacing: .14em;
-    color: #fff;
-    background: var(--accent);
-    border-radius: 4px;
-    padding: 3px 6px;
-  }
-
-  .prose { display: grid; gap: 12px; }
+  .prose { display: grid; gap: 12px; margin: 4px 0; }
   .prose p { font-size: 14.5px; line-height: 1.75; color: var(--ink-soft); }
 
-  /* ---------- 코드 + 설명 ---------- */
-  .code { display: grid; gap: 10px; }
-  .api { font-size: 12.5px; color: var(--ink-soft); }
-  .api span {
-    display: inline-block;
-    font: 600 10px var(--mono);
-    letter-spacing: .14em;
-    color: var(--accent);
-    margin-right: 9px;
-  }
-  .api code { font: 700 12.5px var(--mono); color: var(--ink); }
-  .code pre {
-    background: var(--dark-deep);
-    color: var(--dark-ink);
-    border-radius: 11px;
-    padding: 16px 18px;
-    font: 400 12px/1.75 var(--mono);
-  }
-  .notes { display: grid; gap: 6px; }
-  .notes li {
-    display: grid;
-    grid-template-columns: minmax(96px, auto) 1fr;
-    gap: 12px;
-    font-size: 12.5px;
-    line-height: 1.6;
-  }
+  /* 코드 아래 '왜' 주석 — 디자인 Code 엔 없는, YAML 이 더 가진 내용이다. */
+  .code-wrap { display: grid; gap: 10px; }
+  .notes { display: grid; gap: 6px; margin: 2px 0 4px; }
+  .notes li { display: grid; grid-template-columns: minmax(96px, auto) 1fr; gap: 12px; font-size: 12.5px; line-height: 1.6; }
   .notes .at { font: 700 11.5px var(--mono); color: var(--accent); }
   .notes .why { color: var(--ink-soft); }
 
-  /* ---------- 포인트 카드 ---------- */
-  .points {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
-    gap: 9px;
-  }
-  .points li {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 11px;
-    padding: 14px 16px 15px;
-  }
-  .points h4 { font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 5px; }
-  .points p { font-size: 12.5px; line-height: 1.65; color: var(--ink-soft); }
-
-  /* ---------- 표 ---------- */
-  .tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
-  .tbl th {
-    text-align: left;
-    font: 600 9.5px var(--mono);
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--ink-ghost);
-    padding: 0 16px 9px 0;
-    white-space: nowrap;
-  }
-  .tbl td {
-    padding: 11px 16px 11px 0;
-    border-top: 1px solid var(--line);
-    color: var(--ink-soft);
-    line-height: 1.6;
-    vertical-align: top;
-  }
-  .tbl .cat { font-weight: 700; color: var(--ink); white-space: nowrap; }
-  .tbl .tech { font: 500 12.5px var(--mono); color: var(--accent); }
-
-  /* ---------- 계층도 ---------- */
-  .layers { display: grid; gap: 0; }
-  /* 가이드 ②: 구성요소·관계·흐름. 그림만 있으면 독자가 해석하지 못한다. */
-  .triplet { display: grid; gap: 9px; margin-bottom: 16px; }
+  /* 계층도 위 구성·관계·흐름. 가이드 ②: 그림만 있으면 독자가 해석하지 못한다. */
+  .layers-wrap { margin: 6px 0; }
+  .triplet { display: grid; gap: 9px; margin-bottom: 4px; }
   .triplet > div { display: grid; grid-template-columns: 66px 1fr; gap: 12px; }
   .triplet dt {
-    font: 600 9.5px var(--mono);
-    letter-spacing: .1em;
-    color: #fff;
-    background: var(--accent);
-    border-radius: 5px;
-    padding: 3px 0;
-    text-align: center;
-    height: fit-content;
+    font: 600 9.5px var(--mono); letter-spacing: .1em; color: #fff;
+    background: var(--accent); border-radius: 5px; padding: 3px 0; text-align: center; height: fit-content;
   }
   .triplet dd { font-size: 13px; line-height: 1.68; color: var(--ink-soft); }
 
-  .layer {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 11px;
-    overflow: hidden;
+  /* Mermaid 다이어그램 */
+  .dia { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin: 16px 0; }
+  .dia-body { overflow-x: auto; padding: 20px 18px; }
+  .dia-body :global(svg) { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  .dia figcaption {
+    display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 12px;
+    border-top: 1px solid var(--line); font-size: 12px; line-height: 1.6; color: var(--ink-faint);
   }
-  .layer-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    background: var(--accent);
-    padding: 9px 14px;
-  }
-  .layer-name { font: 700 11px var(--mono); letter-spacing: .12em; color: #fff; }
-  .layer-note { font-size: 11px; color: rgba(255, 255, 255, .78); font-weight: 500; }
-  .nodes { display: flex; flex-wrap: wrap; gap: 7px; padding: 13px 14px 14px; }
-  .node {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px 12px;
-    display: grid;
-    gap: 1px;
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .node-name { font: 600 12px var(--mono); color: var(--ink); }
-  .node-note { font-size: 10.5px; color: var(--ink-faint); }
-  /* 이 문서가 설명하려는 핵심 객체 */
-  .node.is-emphasis { background: var(--dark-deep); border-color: var(--dark-deep); }
-  .node.is-emphasis .node-name { color: #fff; }
-  .node.is-emphasis .node-note { color: #8fb4f8; }
-
-  .edge { text-align: center; padding: 9px 0; }
-  .edge span {
-    font: 600 9px var(--mono);
-    letter-spacing: .14em;
-    color: var(--ink-faint);
-    position: relative;
-  }
-  .edge span::before {
-    content: "↓";
-    display: block;
-    font-size: 12px;
-    letter-spacing: 0;
-    color: var(--accent);
-    margin-bottom: 2px;
-  }
-
-  /* ---------- 수치 ---------- */
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 9px;
-  }
-  .metrics li {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 11px;
-    padding: 13px 16px 14px;
-  }
-  .mlabel { font: 500 11px var(--mono); color: var(--ink-faint); margin-bottom: 5px; }
-  .mvals { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
-  .before { font-size: 14px; font-weight: 600; color: var(--ink-ghost); }
-  .arrow { color: var(--ink-ghost); font-size: 12px; }
-  .after { font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -.03em; }
-  .delta {
-    font: 700 10.5px var(--mono);
-    color: var(--accent);
-    background: var(--accent-tint);
-    border: 1px solid var(--accent-line);
-    padding: 2px 8px;
-    border-radius: 999px;
-  }
-
-  /* ---------- 전후 비교 ---------- */
-  .ba { display: grid; gap: 10px; }
-  .ba-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(224px, 1fr)); gap: 9px; }
-  .ba-col {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 11px;
-    padding: 14px 16px 15px;
-  }
-  .ba-col.is-after { background: var(--accent-tint); border-color: var(--accent-line); }
-  .ba-col h4 { font: 600 9.5px var(--mono); letter-spacing: .14em; color: var(--ink-ghost); margin-bottom: 9px; }
-  .ba-col.is-after h4 { color: var(--accent); }
-  .ba-col li {
-    font-size: 12.5px;
-    line-height: 1.65;
-    color: var(--ink-soft);
-    padding-left: 11px;
-    position: relative;
-  }
-  .ba-col li::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: .62em;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: currentColor;
-    opacity: .4;
-  }
-  .lesson {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 11px 11px 0;
-    padding: 13px 16px;
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--ink-soft);
-  }
-  .lesson span {
-    display: inline-block;
-    font: 700 9.5px var(--mono);
-    letter-spacing: .1em;
-    color: var(--accent);
-    margin-right: 10px;
-  }
+  .dia-label { flex: none; font: 700 8.5px var(--mono); letter-spacing: .14em; color: #fff; background: var(--accent); border-radius: 4px; padding: 3px 6px; }
 </style>

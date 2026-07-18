@@ -1,0 +1,53 @@
+---
+/**
+ * 흐름 카드 — 카드를 화살표로 이어 가로로 세운다. 마지막 칸을 강조할 수 있다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `Plan · Build · Review 3 역할` 덩어리.
+ *
+ * PrincipleCards(3열 큰 번호) · NoteCards(2열) 와 다르다 — 이쪽은 **가로 흐름**이라
+ * 카드 사이에 `→` 가 들어가고, 순서가 뒤로 갈수록 결과에 가까워진다.
+ * Bond 는 마지막(REVIEW) 칸만 연파랑 배경으로 강조한다 — 이 사이클의 핵심이 리뷰라서다.
+ *
+ * 각 카드는 라벨(모노 파랑 · 01 · PLAN) + 제목 + 본문 세 줄이다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Card {
+  /** 모노 파란 윗줄. 예: 01 · PLAN */
+  label: string;
+  title: string;
+  body: string;
+  /** 강조 칸인지. 연파랑 배경 + 파란 테두리 + 본문 진하게. */
+  accent?: boolean;
+}
+
+interface Props {
+  cards: Card[];
+  /** 카드 사이 화살표 글자. 예: → */
+  arrow: string;
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0 4px` */
+  margin: string;
+}
+
+const { cards, arrow, margin } = Astro.props;
+
+const CARD = 'flex:1;min-width:180px;border:1px solid rgba(20,22,26,.1);border-radius:12px;padding:15px 16px;background:#fff';
+const CARD_ACCENT = 'flex:1;min-width:180px;border:1px solid #cddcfb;border-radius:12px;padding:15px 16px;background:#f8faff';
+const LABEL = "font:700 10px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#2563eb;margin-bottom:6px";
+const ARROW = 'display:flex;align-items:center;color:#93b4f5;font-weight:700';
+/* 강조 칸만 본문이 조금 진하다(#44454a), 나머지는 #55565a */
+---
+
+<div style={`display:flex;align-items:stretch;gap:10px;margin:${margin};flex-wrap:wrap`}>
+  {cards.map((c, i) => (
+    <>
+      {i > 0 && <div style={ARROW}>{arrow}</div>}
+      <div style={c.accent === true ? CARD_ACCENT : CARD}>
+        <div style={LABEL}>{c.label}</div>
+        <div style="font-size:13.5px;font-weight:700;color:#17181a;margin-bottom:4px">{c.title}</div>
+        <div style={`font-size:12px;line-height:1.55;color:${c.accent === true ? '#44454a' : '#55565a'}`} set:html={rich(c.body)} />
+      </div>
+    </>
+  ))}
+</div>

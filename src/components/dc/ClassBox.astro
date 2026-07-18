@@ -3,52 +3,76 @@
  * UML 클래스 박스 하나.
  *
  * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
- * 원본 대조: design.html 의 `«interface» IFighter` 박스와 `PlayerController` 박스.
+ * 원본 대조: 뱀서 `«interface» IFighter` · Bond `«interface» ITurnUseUnit` · `MapGenerator`.
  *
- * 원본은 두 종류를 쓴다.
+ * 헤더 색이 곧 위계다.
  *   contract — 검정 헤더(#17181a). 인터페이스·추상 클래스. 「계약」쪽.
  *   impl     — 파란 헤더(#2563eb). 그 계약을 구현하는 구체 클래스.
- * 색이 곧 위계다. 검정을 보면 '이건 약속', 파랑을 보면 '이건 실제 물건'으로 읽힌다.
  *
- * Mermaid 로도 클래스 다이어그램을 그릴 수 있지만 이 박스는 손으로 배치한 것이라
- * 자동 배치로는 같은 그림이 안 나온다. 그래서 마크업을 떠 왔다.
+ * 몸통은 네 조각을 순서대로 쌓는다. 있는 것만 그린다.
+ *   subType    — 헤더 아래 작은 회색 주석 한 줄. 예: `: IComparable<ITurnUseUnit>`.
+ *                필드가 아니라 '이 인터페이스가 또 무엇을 상속하나' 같은 이차 계약이라 더 흐리다.
+ *   fields     — 필드 칸. 왼쪽 정렬.
+ *   methods    — 메서드 칸. 왼쪽 정렬.
+ *   descriptor — 메서드 대신 오는 **가운데 정렬 회색 한 줄**. 예: `절차적 10단계 · 시드 공유`.
+ *                Bond 의 구현 상자들이 메서드를 안 적고 한 줄 설명만 다는 자리다.
+ *
+ * **Bond 가 subType · descriptor 두 조각을 반증했다.** 뱀서만 보고 떴을 때는 헤더+필드+메서드
+ * 셋뿐이라 생각했다. 두 번째 문서가 나머지를 드러냈다.
+ *
+ * Mermaid 로는 이 그림이 안 나온다 — 손으로 배치한 것이라 자동 배치와 다르다.
  */
+import { escapeHtml } from '../../lib/rich';
+
 interface Props {
-  /** 헤더 윗줄. 예: «interface» · «abstract» : MonoBehaviour · : IFighter, MonoBehaviour */
-  stereotype: string;
+  /** 헤더 윗줄. 예: «interface» · : IFighter, MonoBehaviour. 없으면 그 줄을 뺀다. */
+  stereotype?: string;
   name: string;
-  /** 필드 칸. 없으면 그 칸을 통째로 뺀다. */
+  /** 헤더 아래 이차 계약 한 줄. 예: `: IComparable<ITurnUseUnit>` */
+  subType?: string;
+  /** 필드 칸. 없으면 뺀다. */
   fields?: string[];
-  /** 메서드 칸 */
-  methods: string[];
-  /** 계약(검정)인지 구현(파랑)인지 */
+  /** 메서드 칸. descriptor 를 쓰면 비운다. */
+  methods?: string[];
+  /** 메서드 대신 오는 가운데 정렬 한 줄. methods 와 같이 쓰지 않는다. */
+  descriptor?: string;
   kind: 'contract' | 'impl';
-  /** 원본이 박스마다 폭을 따로 준다. 계약 244px · 구현 232px 등. */
+  /** 원본이 박스마다 폭을 따로 준다. */
   width: number;
 }
 
-const { stereotype, name, fields = [], methods, kind, width } = Astro.props;
+const { stereotype, name, subType, fields = [], methods = [], descriptor, kind, width } = Astro.props;
 
 const isContract = kind === 'contract';
 const border = isContract ? '#17181a' : '#2563eb';
 const headBg = isContract ? '#17181a' : '#2563eb';
-/* 스테레오타입 글자색만 검정/파랑 헤더에서 다르다 */
 const stereoColor = isContract ? '#9fb8f0' : '#c7dbff';
 
-/* 원본의 속성 순서를 그대로 따른다. 필드 칸은 padding → border-bottom → font 순이다. */
+/* 원본의 속성 순서를 그대로 따른다. */
+const SUBTYPE_ROW =
+  "padding:5px 11px;border-bottom:1px solid rgba(20,22,26,.12);font:500 9px/1.6 'JetBrains Mono',monospace;color:#8a8b90";
 const FIELD_ROW =
   "padding:6px 11px;border-bottom:1px solid rgba(20,22,26,.12);font:500 9.5px/1.7 'JetBrains Mono',monospace;color:#55565a";
 const METHOD_ROW = "padding:6px 11px;font:500 9.5px/1.7 'JetBrains Mono',monospace;color:#26272b";
+const DESCRIPTOR_ROW = "padding:6px 11px;font:500 9px/1.5 'JetBrains Mono',monospace;color:#55565a;text-align:center";
+
+/**
+ * 줄바꿈은 `<br>` 로 잇되 내용은 이스케이프한다.
+ * C# 제네릭이 그대로 들어오므로(`Queue<InGameEvent>`) 안 막으면 태그로 샌다.
+ */
+const lines = (xs: string[]): string => xs.map(escapeHtml).join('<br>');
 ---
 
 <div
   style={`border:1.5px solid ${border};border-radius:7px;overflow:hidden;background:#fff;box-shadow:0 2px 9px rgba(20,22,26,.1);width:${width}px`}
 >
   <div style={`background:${headBg};padding:7px 12px;text-align:center`}
-  ><div style={`font:600 8px 'JetBrains Mono',monospace;letter-spacing:.08em;color:${stereoColor}`}
-    >{stereotype}</div><div style="font:700 12px 'JetBrains Mono',monospace;color:#fff">{name}</div></div>
-  {fields.length > 0 && <div style={FIELD_ROW} set:html={fields.join('<br>')} />}<div
-    style={METHOD_ROW}
-    set:html={methods.join('<br>')}
-  />
+  >{stereotype !== undefined && (<div style={`font:600 8px 'JetBrains Mono',monospace;letter-spacing:.08em;color:${stereoColor}`}
+    >{stereotype}</div>)}<div style="font:700 12px 'JetBrains Mono',monospace;color:#fff">{name}</div></div>{subType !== undefined && (
+    <div style={SUBTYPE_ROW} set:html={escapeHtml(subType)} />
+  )}{fields.length > 0 && <div style={FIELD_ROW} set:html={lines(fields)} />}{descriptor !== undefined ? (
+    <div style={DESCRIPTOR_ROW} set:html={escapeHtml(descriptor)} />
+  ) : (
+    <div style={METHOD_ROW} set:html={lines(methods)} />
+  )}
 </div>

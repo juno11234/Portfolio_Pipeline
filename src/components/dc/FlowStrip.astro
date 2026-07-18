@@ -1,0 +1,53 @@
+---
+/**
+ * 흐름 띠 — 가운데 정렬 카드(이름 + 설명)를 화살표로 이어 가로로 세운다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `Config 로더 — Loader / Package / Cache 3단` 덩어리.
+ *
+ * Pipeline(데이터 파이프라인)과 비슷하지만 칸이 다르다 — 저쪽은 위 작은 라벨 + 아래 이름
+ * 두 줄이고, 이쪽은 이름 + 설명 두 줄이다(가운데 정렬 카드). 마지막 칸만 연파랑으로 강조한다
+ * (핸들을 해제하고도 참조를 쥐는 Cache 가 이 3단의 요점이라서다).
+ *
+ * FlowCards(에이전트 3역할)와도 다르다 — 저쪽은 라벨+제목+본문 3줄에 강조가 배경 전체,
+ * 이쪽은 2줄에 min-width 가 더 좁다. 값이 달라 합치지 않는다.
+ *
+ * 경계를 넘는 화살표(⇒)만 파랑이고 나머지(→)는 흐린 파랑이다 — Pipeline 과 같은 규칙이다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Stage {
+  name: string;
+  note: string;
+  /** 강조 칸인지. 연파랑 배경 + 파란 이름 + 진한 설명. */
+  accent?: boolean;
+  /** 이 칸 **뒤** 화살표. 마지막 칸엔 없다. 예: → · ⇒ */
+  arrow?: string;
+  /** 화살표를 파랑으로 칠할지. 경계를 넘는 ⇒ 가 파랑이다. */
+  arrowAccent?: boolean;
+}
+
+interface Props {
+  stages: Stage[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { stages, margin } = Astro.props;
+
+const CARD = 'flex:1;min-width:150px;text-align:center;background:#fafafa;border:1px solid rgba(20,22,26,.12);border-radius:9px;padding:12px 10px';
+const CARD_ACCENT = 'flex:1;min-width:150px;text-align:center;background:#eef3ff;border:1px solid #cddcfb;border-radius:9px;padding:12px 10px';
+---
+
+<div style={`display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:${margin};padding:16px;border:1px solid rgba(20,22,26,.1);border-radius:12px;background:#fff`}>
+  {stages.map((s) => (
+    <>
+      <div style={s.accent === true ? CARD_ACCENT : CARD}><div
+          style={`font:700 11.5px 'JetBrains Mono',monospace;color:${s.accent === true ? '#1d4ed8' : '#17181a'};margin-bottom:5px`}
+        >{s.name}</div><div style={`font-size:11px;line-height:1.5;color:${s.accent === true ? '#44454a' : '#6b6b6b'}`} set:html={rich(s.note)} /></div>
+      {s.arrow !== undefined && (
+        <div style={s.arrowAccent === true ? 'display:flex;align-items:center;color:#2563eb;font-weight:700' : 'display:flex;align-items:center;color:#93b4f5;font-weight:700'}>{s.arrow}</div>
+      )}
+    </>
+  ))}
+</div>

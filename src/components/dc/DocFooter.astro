@@ -1,0 +1,29 @@
+---
+/**
+ * 문서 맨 아래 맺음말.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `감사합니다 THANK YOU` 덩어리.
+ *
+ * 이름·연락처는 값으로 받는다. 원본은 글자를 직접 박아뒀지만, 그러면 연락처가
+ * 문서마다 복제된다 — 프로젝트가 6개면 6곳에 살고 언젠가 어긋난다.
+ * 사이트에 하나뿐인 정보는 profile.yaml 이 원본이어야 한다.
+ */
+interface Props {
+  /** 큰 글씨. 예: 감사합니다 */
+  thanks: string;
+  /** 그 옆 작은 모노 글씨. 예: THANK YOU */
+  thanksSub: string;
+  /** 아래 한 줄. 예: 이주노 · cozam2@naver.com · Unity · C# */
+  byline: string;
+}
+
+const { thanks, thanksSub, byline } = Astro.props;
+---
+
+<footer style="margin-top:82px;padding-top:30px;border-top:1px solid rgba(20,22,26,.1);text-align:center">
+  <div style="font-size:21px;font-weight:800;letter-spacing:-.02em;color:#17181a">{thanks}{' '}<span
+      style="font:600 11px 'JetBrains Mono',monospace;color:#a0a1a6;letter-spacing:.14em;margin-left:6px"
+    >{thanksSub}</span></div>
+  <div style="margin-top:9px;font:500 11px 'JetBrains Mono',monospace;color:#8a8b90">{byline}</div>
+</footer>

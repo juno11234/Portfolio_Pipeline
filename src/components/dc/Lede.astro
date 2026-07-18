@@ -1,0 +1,44 @@
+---
+/**
+ * 설명 문단 — 제목·그림·섹션에 딸리는 산문 한 문단.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: 뱀서·Bond 의 여러 `<p>` 문단.
+ *
+ * 원본이 세 종류를 쓴다.
+ *   intro — 섹션 헤더 바로 아래, 첫 꼭지 앞. 680px · 14px · #44454a. 섹션 전체를 소개한다.
+ *   lede  — 꼭지 제목 바로 아래. 660px · 13.5px · #55565a. 그 꼭지를 소개한다.
+ *   note  — 그림·표 아래 잔글씨. 폭 제한 없음 · 12.5px.
+ *
+ * **Bond 가 intro 와 line-height 드리프트를 반증했다.** 뱀서엔 intro 문단이 없고
+ * lede 는 line-height 1.66 인데, Bond lede 는 1.64 다. 같은 자리인데 값이 흔들린다.
+ * 그래서 lineHeight 를 prop 으로 뺐다(기본은 뱀서 값). margin 을 뺀 것과 같은 이유다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  /** 원본이 이 자리에 박아둔 margin. 예: `0 0 14px` */
+  margin: string;
+  /** intro(섹션 소개) · lede(꼭지 소개) · note(그림·표 잔글씨) */
+  kind?: 'intro' | 'lede' | 'note';
+  /** line-height. 원본이 흔들린다(뱀서 lede 1.66 · Bond lede 1.64). 생략하면 kind 별 기본값. */
+  lineHeight?: string;
+  /** 문장. `**굵게**` 와 `` `코드` `` 를 쓸 수 있다. */
+  text: string;
+}
+
+const { margin, kind = 'lede', lineHeight, text } = Astro.props;
+
+/* kind 별 기본 line-height (뱀서 기준) */
+const DEFAULT_LH: Record<string, string> = { intro: '1.66', lede: '1.66', note: '1.6' };
+const lh = lineHeight ?? DEFAULT_LH[kind];
+
+/* 원본의 세 가지 본문 style. line-height 만 위에서 끼운다. */
+const BODY: Record<string, string> = {
+  intro: `max-width:680px;font-size:14px;line-height:${lh};color:#44454a;text-wrap:pretty`,
+  lede: `max-width:660px;font-size:13.5px;line-height:${lh};color:#55565a`,
+  note: `font-size:12.5px;line-height:${lh};color:#55565a`,
+};
+---
+
+<p style={`margin:${margin};${BODY[kind]}`} set:html={rich(text)} />

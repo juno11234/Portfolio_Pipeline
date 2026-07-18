@@ -1,0 +1,65 @@
+---
+/**
+ * 전후 비교 — 두 칸에 스크린샷을 나란히 놓고 색으로 판정한다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `BEFORE ASTC 6×6 압축` / `AFTER RGBA 32bit 무압축` 덩어리.
+ *
+ * 글로 "색이 뭉개졌다"고 쓰면 읽는 사람이 상상해야 한다. 원본이 결과 이미지와
+ * 임포트 설정을 같이 넣은 이유다 — 무엇이 달라졌는지(결과)와 무엇을 만졌는지(설정)를
+ * 한 칸에서 같이 본다.
+ *
+ * 아래 한 줄의 색이 판정이다. before 는 빨강(#b91c1c), after 는 파랑(#1d4ed8).
+ */
+interface Side {
+  /** 배지. BEFORE · AFTER */
+  badge: string;
+  /** 배지 옆 한마디. 예: ASTC 6×6 압축 */
+  title: string;
+  /** 위에 오는 결과 그림. 폭이 고정(132px)이다. */
+  result: { src: string; alt: string };
+  /** 아래 오는 설정 그림. 칸 폭을 채운다. */
+  settings: { src: string; alt: string };
+  /** 맨 아래 판정 한 줄 */
+  note: string;
+}
+
+interface Props {
+  before: Side;
+  after: Side;
+  /** 원본이 이 자리에 박아둔 margin. 예: `18px 0 4px` */
+  margin: string;
+}
+
+const { before, after, margin } = Astro.props;
+
+/* 원본이 칸마다 반복하는 style */
+const HEAD_ROW = 'padding:9px 13px;display:flex;align-items:center;gap:8px';
+const BODY = 'padding:14px;display:flex;flex-direction:column;align-items:center;gap:11px';
+const RESULT_IMG = 'width:132px;height:auto;border-radius:7px';
+const SETTINGS_IMG = 'display:block;width:100%;height:auto;border:1px solid rgba(20,22,26,.1);border-radius:6px';
+const NOTE = 'padding:0 14px 13px;font-size:11.5px;line-height:1.5';
+---
+
+<div style={`display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:${margin}`}>
+  <div style="border:1px solid rgba(20,22,26,.12);border-radius:12px;overflow:hidden;background:#fff">
+    <div style={`padding:9px 13px;background:#f4f5f7;border-bottom:1px solid rgba(20,22,26,.08);display:flex;align-items:center;gap:8px`}><span
+        style="font:700 8.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#8a8b90;background:#fff;border:1px solid rgba(20,22,26,.16);border-radius:4px;padding:2px 6px"
+      >{before.badge}</span><span style="font:600 11px 'JetBrains Mono',monospace;color:#55565a">{before.title}</span></div>
+    <div style={BODY}>
+      <img src={before.result.src} alt={before.result.alt} style={RESULT_IMG} />
+      <img src={before.settings.src} alt={before.settings.alt} style={SETTINGS_IMG} />
+    </div>
+    <div style={`${NOTE};color:#b91c1c`}>{before.note}</div>
+  </div>
+  <div style="border:1px solid #cddcfb;border-radius:12px;overflow:hidden;background:#fff">
+    <div style={`padding:9px 13px;background:#eef3ff;border-bottom:1px solid #cddcfb;display:flex;align-items:center;gap:8px`}><span
+        style="font:700 8.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#fff;background:#2563eb;border-radius:4px;padding:2px 6px"
+      >{after.badge}</span><span style="font:600 11px 'JetBrains Mono',monospace;color:#1d4ed8">{after.title}</span></div>
+    <div style={BODY}>
+      <img src={after.result.src} alt={after.result.alt} style={RESULT_IMG} />
+      <img src={after.settings.src} alt={after.settings.alt} style={SETTINGS_IMG} />
+    </div>
+    <div style={`${NOTE};color:#1d4ed8`}>{after.note}</div>
+  </div>
+</div>

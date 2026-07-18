@@ -1,0 +1,32 @@
+---
+/**
+ * 미니 카드 — 가운데 정렬로 이름 + 한 줄을 담는 작은 카드 3열.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: bond.dc.html 의 `3중 캐시`(_skillDict / _skillsByType / _allSkillsList).
+ *
+ * NoteCards(왼쪽 정렬 · 흰 배경)와 다르다 — 이쪽은 **가운데 정렬 · 배경 #fbfbfa** 라
+ * 자료구조 세 벌을 라벨처럼 나란히 보인다. 설명이 짧아(id → SkillData) 카드가 작다.
+ * 제목은 모노 파랑, 그 아래 회색 한 줄이 붙는다.
+ */
+interface Card {
+  name: string;
+  note: string;
+}
+
+interface Props {
+  cards: Card[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0` */
+  margin: string;
+}
+
+const { cards, margin } = Astro.props;
+
+const CARD = 'border:1px solid rgba(20,22,26,.12);border-radius:10px;padding:12px 13px;background:#fbfbfa;text-align:center';
+---
+
+<div style={`display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:${margin}`}>
+  {cards.map((c) => (
+    <div style={CARD}><div style="font:700 11px 'JetBrains Mono',monospace;color:#1d4ed8">{c.name}</div><div style="font-size:11px;color:#6b6b6b;margin-top:3px">{c.note}</div></div>
+  ))}
+</div>

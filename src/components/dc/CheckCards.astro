@@ -1,0 +1,45 @@
+---
+/**
+ * 체크 카드 격자 — 동그란 ✓ + 제목 + 한 줄.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `적용 · GC 최적화 6가지` 덩어리.
+ *
+ * NoteCards 와 겉보기엔 둘 다 '2열 카드'지만 속이 다르다 — 이쪽은 flex 로 ✓ 동그라미를
+ * 왼쪽에 세우고 제목·본문을 오른쪽에 쌓는다. 여백도 반경도 글자 크기도 다르다.
+ * 처음에 NoteCards 에 check 옵션으로 붙이려다 원본과 대조해 보고 갈랐다.
+ *
+ * '무엇을 적용했다'를 세는 목록이라 ✓ 가 붙는다. 항목마다 근거를 한 줄씩 달아
+ * 이름만 나열하는 것을 막는다.
+ */
+import { rich } from '../../lib/rich';
+
+interface Card {
+  title: string;
+  /** 왜/어떻게 한 줄. 예: 런타임 Instantiate·Destroy 제거 */
+  body: string;
+}
+
+interface Props {
+  cards: Card[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `16px 0 4px` */
+  margin: string;
+}
+
+const { cards, margin } = Astro.props;
+
+/* 원본이 카드마다 반복하는 style */
+const CARD =
+  'display:flex;gap:11px;align-items:flex-start;border:1px solid rgba(20,22,26,.1);border-radius:10px;padding:13px 15px;background:#fff';
+const CHECK =
+  "flex:none;width:19px;height:19px;border-radius:50%;background:#eef3ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font:700 11px 'JetBrains Mono',monospace";
+---
+
+<div style={`display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:${margin}`}>
+  {cards.map((c) => (
+    <div style={CARD}><span style={CHECK}>✓</span><div><div style="font-size:13px;font-weight:700;color:#17181a">{c.title}</div><div
+          style="font-size:11.5px;color:#55565a;margin-top:2px"
+          set:html={rich(c.body)}
+        /></div></div>
+  ))}
+</div>

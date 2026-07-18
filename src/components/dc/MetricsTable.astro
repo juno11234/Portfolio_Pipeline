@@ -1,0 +1,58 @@
+---
+/**
+ * 수치 개선 표 — 지표 · 전 · 후 · 개선폭.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `결과 · 최적화 전후 · Profiler 실측` 표.
+ *
+ * 가이드 ⑤: "'빨라졌다'가 아니라 '15초가 3초가 됐다'."
+ * 세 숫자 열의 색이 다른 것이 요점이다 — 전(회색)은 지나간 값, 후(잉크)는 지금 값,
+ * 개선폭(파랑)은 이 문서가 증명하려는 값. 눈이 오른쪽 끝으로 가게 되어 있다.
+ *
+ * DataTable 과 합치지 않았다. 글자 크기(13px↔12.5px)와 칸 여백(12px↔10px)이 다르다.
+ */
+interface Row {
+  label: string;
+  before: string;
+  after: string;
+  /** 예: 97% ↓ */
+  delta: string;
+}
+
+interface Props {
+  /** 네 칸. 첫 칸만 왼쪽 정렬이고 나머지는 오른쪽 정렬이다. */
+  headers: [string, string, string, string];
+  rows: Row[];
+  /** 원본이 이 자리에 박아둔 margin. 예: `14px 0 10px` */
+  margin: string;
+}
+
+const { headers, rows, margin } = Astro.props;
+
+/* 원본이 칸마다 반복하는 style */
+const TH_BASE =
+  "font:600 10px 'JetBrains Mono',monospace;letter-spacing:.06em;color:#8a8b90;text-transform:uppercase;padding:10px 12px;border-bottom:1.5px solid rgba(20,22,26,.16)";
+const TD = 'padding:12px;border-bottom:1px solid rgba(20,22,26,.07)';
+const NUM = `${TD};text-align:right;font-family:'JetBrains Mono',monospace`;
+---
+
+<table style={`width:100%;border-collapse:collapse;margin:${margin};font-size:13px`}>
+  <thead>
+    <tr>
+      <th style={`text-align:left;${TH_BASE}`}>{headers[0]}</th>
+      <th style={`text-align:right;${TH_BASE}`}>{headers[1]}</th>
+      <th style={`text-align:right;${TH_BASE}`}>{headers[2]}</th>
+      <th style={`text-align:right;${TH_BASE}`}>{headers[3]}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows.map((r) => (
+      <tr>
+        <td style={`${TD};color:#17181a;font-weight:600`}>{r.label}</td>
+        <td style={`${NUM};color:#55565a`}>{r.before}</td>
+        <td style={`${NUM};color:#17181a;font-weight:600`}>{r.after}</td>
+        <td style={`${NUM};font-weight:700;color:#1d4ed8`}>{r.delta}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>

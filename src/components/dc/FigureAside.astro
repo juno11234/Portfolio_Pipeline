@@ -1,0 +1,56 @@
+---
+/**
+ * 그림 + 옆에 붙는 설명 — 세로로 긴 스크린샷용.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `EDITOR TOOL · VamSir Tools ▸ Data Importer` 덩어리.
+ *
+ * 개요의 대표 화면(Overview 안 figure)과 달리 캡션이 **아래가 아니라 옆**에 온다.
+ * 에디터 윈도우처럼 폭이 좁은 그림은 가로로 늘리면 흐려지므로 원본이 폭을 고정하고
+ * 남는 자리에 설명을 넣었다. 그래서 그림 폭(width)을 값으로 받는다.
+ *
+ * **Bond 가 값 묶음을 반증했다.** 뱀서(에디터 툴)와 Bond(맵 스크린샷)가 gap·모서리·캡션
+ * 글자에서 조금씩 다르다. 두 벌로 뭉쳐 size 로 받는다 — 흩어진 값을 하나씩 prop 으로
+ * 빼면 호출부가 지저분하고, 실제로 원본에 두 크기밖에 없다.
+ *   sm — 뱀서. gap 18 · 모서리 11 · 캡션 12.5px/1.62/회색.
+ *   md — Bond. gap 20 · 모서리 12 · 캡션 13px/1.64/진회색.
+ */
+import { rich } from '../../lib/rich';
+
+interface Props {
+  src: string;
+  alt: string;
+  /** 원본이 그림마다 정한 폭. 예: 330 · 250 */
+  width: number;
+  /** 그림 뒤 배경. 스크린샷 여백과 이어 붙이려고 원본이 그림마다 정한다. 예: #2b2b2b */
+  background: string;
+  /** 캡션 위 배지. 예: EDITOR TOOL · SCREENSHOT */
+  label: string;
+  /** 캡션 본문. `**굵게**` 와 `` `코드` `` 를 쓸 수 있다. */
+  caption: string;
+  /** 흩어진 값 묶음. sm=뱀서 · md=Bond. */
+  size: 'sm' | 'md';
+  /** 원본이 이 자리에 박아둔 margin. 예: `18px 0 4px` · `8px 0 22px` */
+  margin: string;
+}
+
+const { src, alt, width, background, label, caption, size, margin } = Astro.props;
+
+const sm = size === 'sm';
+const gap = sm ? 18 : 20;
+const radius = sm ? 11 : 12;
+const CAP = sm ? 'min-width:220px;font-size:12.5px;line-height:1.62;color:#55565a' : 'min-width:240px;font-size:13px;line-height:1.64;color:#44454a';
+/* 배지 아래 여백도 흔들린다(뱀서 8px · Bond 9px). size 묶음에 같이 넣는다. */
+const badgeMb = sm ? 8 : 9;
+---
+
+<figure style={`margin:${margin};display:flex;gap:${gap}px;align-items:center;flex-wrap:wrap`}>
+  <div
+    style={`border:1px solid rgba(20,22,26,.12);border-radius:${radius}px;overflow:hidden;box-shadow:0 4px 16px rgba(20,22,26,.12);flex:none;background:${background}`}
+  >
+    <img src={src} alt={alt} style={`display:block;width:${width}px;height:auto`} />
+  </div>
+  <figcaption style={`flex:1;${CAP}`}><span
+      style={`display:inline-block;font:700 8.5px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#fff;background:#2563eb;border-radius:4px;padding:2px 6px;margin-bottom:${badgeMb}px`}
+    >{label}</span><br /><Fragment set:html={rich(caption)} /></figcaption>
+</figure>

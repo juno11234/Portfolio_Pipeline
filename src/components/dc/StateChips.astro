@@ -1,0 +1,59 @@
+---
+/**
+ * 상태 전이 — 알약을 화살표로 이어 한 줄로 늘어놓는다.
+ *
+ * **claude.ai/design 의 마크업을 글자 그대로 옮긴 것이다.** style 문자열을 손대지 않았다.
+ * 원본 대조: design.html 의 `풀 재사용 상태 전이` 덩어리.
+ *
+ * 뱀서라이크 '적 생명주기'와 Bond '노드 상태 전이'가 같은 모양이다.
+ * 상태가 적고 한 방향으로 흐르는 그림이라 Mermaid 를 쓸 이유가 없다 — 한 줄이면 끝난다.
+ *
+ * 알약 색이 곧 상태의 성격이다.
+ *   start   — 연파랑 테두리. 시작 지점(Available).
+ *   plain   — 회색. 보통 상태.
+ *   current — 솔리드 파랑 + 흰 글씨. '지금 여기'(Current). Bond 가 반증해 추가했다.
+ *   dead    — 빨강. 끝나는 지점(사망).
+ *
+ * **꼬리 노트(tail):** Bond 는 스페이서로 밀어 오른쪽 끝에 빨간 주석 알약을 하나 단다
+ * (형제 경로 → Locked 영구). 상태 흐름 밖의 규칙을 같은 줄 끝에 얹은 것이다.
+ */
+interface Step {
+  label: string;
+  kind?: 'start' | 'plain' | 'current' | 'dead';
+  /** 이 알약 **뒤에** 오는 화살표 글자. 마지막 알약에는 없다. 예: → · ⟳ */
+  arrow?: string;
+}
+
+interface Props {
+  steps: Step[];
+  /** 오른쪽 끝에 스페이서로 밀어 붙이는 빨간 주석 알약. 예: 형제 경로 → Locked 영구 */
+  tail?: string;
+}
+
+const { steps, tail } = Astro.props;
+
+/* 원본이 알약마다 반복하는 style */
+const CHIP: Record<string, string> = {
+  start: "font:600 10.5px 'JetBrains Mono',monospace;color:#1d4ed8;background:#eef3ff;border:1px solid #cddcfb;border-radius:6px;padding:5px 9px",
+  plain: "font:600 10.5px 'JetBrains Mono',monospace;color:#44454a;background:#f4f4f2;border-radius:6px;padding:5px 9px",
+  current: "font:600 10.5px 'JetBrains Mono',monospace;color:#fff;background:#2563eb;border-radius:6px;padding:5px 9px",
+  dead: "font:600 10.5px 'JetBrains Mono',monospace;color:#b91c1c;background:#fbeaea;border-radius:6px;padding:5px 9px",
+};
+/* 꼬리 노트는 알약보다 얇다(font:500 10px). 상태가 아니라 주석이라서다. */
+const TAIL = "font:500 10px 'JetBrains Mono',monospace;color:#b91c1c;background:#fbeaea;border-radius:6px;padding:5px 9px";
+---
+
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:15px;border:1px solid rgba(20,22,26,.1);border-radius:11px;background:#fff;margin:14px 0">
+  {steps.map((s) => (
+    <>
+      <span style={CHIP[s.kind ?? 'plain']}>{s.label}</span>{s.arrow !== undefined && (
+        <span style="color:#c2c3c8;font-weight:700">{s.arrow}</span>
+      )}
+    </>
+  ))}{tail !== undefined && (
+    <>
+      <span style="flex:1"></span>
+      <span style={TAIL}>{tail}</span>
+    </>
+  )}
+</div>
