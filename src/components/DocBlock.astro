@@ -171,8 +171,9 @@ const cardItems = b.type === 'points' ? b.items : [];
 {b.type === 'chips' && b.variant === 'condition' && (
   <ConditionPills marginBottom="6px" items={b.items.map((it: any) => it.label)} />
 )}
+{/* 스키마는 알약 색을 tone 으로 받고 StateChips 는 kind 로 읽는다 — 어댑터에서 잇는다. */}
 {b.type === 'chips' && (b.variant === undefined || b.variant === 'state') && (
-  <StateChips steps={b.items} tail={b.tail} />
+  <StateChips steps={b.items.map((it: any) => ({ label: it.label, kind: it.tone, arrow: it.arrow }))} tail={b.tail} />
 )}
 
 <style>

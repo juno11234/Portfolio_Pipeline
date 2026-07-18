@@ -1,0 +1,792 @@
+# SoulLike 기술 문서.
+#
+# 내용 출처: claude.ai/design 의 "soulslike.dc.html"(.design-src, 7섹션)를 섹션별로 옮긴 것.
+# meta 는 포트폴리오/소울라이크 PDF 에서 확인 — 지어낸 값 없음.
+# 그래프(FSM·행동트리·타입계층)는 mermaid 로 그린다. 손그림 dc 컴포넌트는 디자인 검증용이었다.
+#
+# 디자인 섹션 → 파이프라인 5단 매핑:
+#   01 개요            → overview
+#   02 시스템 구조      → architecture (+ 디자인 01의 기술 스택 표를 첫 꼭지로 흡수)
+#   03 입력·플레이어 FSM → features[0]
+#   04 전투·MVVM       → features[1]
+#   05 적 AI·행동 트리   → features[2]  (FSM vs BT 결정 포함)
+#   06 보스·카메라·월드  → features[3]
+#   07 데이터·빌드·회고  → features[4](데이터·빌드) + retrospective(회고)
+subtitle: 3인칭 소울라이크 액션
+overview:
+  lead: >-
+    **스태미나를 소모하는 회피·공격**과 **화톳불 세이브**, 2페이즈 보스를 갖춘 3인칭 소울라이크 액션 게임입니다.
+    1인 개발로 **FSM 플레이어 · Behaviour Tree 몬스터 AI · 이벤트 기반 MVVM · Jenkins CI**까지
+    60개 스크립트(5,484줄)를 직접 설계·구현했습니다.
+  what: >-
+    플레이어는 **유한 상태 머신(FSM)**으로, 몬스터는 **행동 트리(BT)**로 움직입니다.
+    전투·피격·UI 갱신은 모두 **이벤트와 Observable**로 흐르는 단방향 구조입니다.
+  why: >-
+    상태가 늘수록 전이 조건이 폭발하는 FSM의 한계를 **항상 트리 구조인 BT**로 풀고,
+    잦은 UI 변경에는 **낮은 결합의 MVVM**으로 대응하는 것이 이 프로젝트의 승부처입니다.
+  evidence: >-
+    **입력→상태→전투→데이터→UI** 단방향 계층을 두고, 역방향은 전부 `event · Observable<T>`로 통신합니다.
+    몬스터는 **재귀 Behaviour Tree**로, 그중 ==Sequence_Memory==가 콤보 끊김 버그를 해결했습니다.
+    전투는 **이벤트 큐 + 애니메이션 주도 판정**, 빌드는 **Jenkins CI**로 자동화했습니다.
+  scope: >-
+    단방향 5계층 아키텍처, 입력 2단 릴레이와 플레이어 FSM, 이벤트 큐 전투와 MVVM, 행동 트리 몬스터 AI,
+    보스 2페이즈·락온 카메라·월드 게이팅, TSV 데이터 파이프라인과 Jenkins CI를 다룹니다.
+    아트·사운드·레벨 디자인은 이 문서의 범위가 아닙니다.
+screenshot:
+  src: ../../assets/soulslike/soul-gameplay.png
+  caption: 3인칭 소울라이크 전투 — 락온 인디케이터, HP·스태미나 바, 2페이즈 보스
+meta:
+  team: 1인
+  period: 2025.11.10 ~ 11.30
+  vcs: Github Desktop
+  engine: Unity 6000.0.56f1 · URP
+  # PDF p4 표기는 2025.2.1이나 실제 사용 버전은 2025.1.4 (사용자 확인)
+  ide: Rider 2025.1.4
+# 유튜브·깃허브 링크는 PDF p4에 있으나 URL 미확정 — 나중에 추가(자리만 비워둠)
+links: []
+architecture:
+  title: 시스템 구조
+  intro: >-
+    시스템은 **입력 → 상태 → 전투 → 데이터 → UI** 방향의 단방향 흐름을 가집니다.
+    역방향 통신은 전부 `event` 또는 `Observable<T>`로 이루어져, 하위 계층이 상위 계층을 직접 참조하지 않습니다.
+  parts:
+    - badge: 기술 스택
+      title: 계약 기반 · 무참조 결합을 위한 도구 선택
+      blocks:
+        - type: stack-table
+          rows:
+            - category: 엔진 · 렌더
+              tech: Unity 6000.0.56f1 · URP 17
+              purpose: 3D 소울라이크 액션 · Universal Render Pipeline
+            - category: 입력
+              tech: Input System 1.14
+              purpose: 디바이스 콜백을 의미 이벤트로 변환하는 2단 릴레이
+            - category: 내비게이션
+              tech: AI Navigation 2.0
+              purpose: NavMeshAgent 기반 몬스터 추격·순찰 이동
+            - category: 비동기 처리
+              tech: UniTask
+              purpose: GC 없는 async/await · 씬 페이드 취소 토큰 연동
+            - category: UI
+              tech: uGUI · TextMeshPro
+              purpose: HP·스태미나 바, 인벤토리 드래그 앤 드롭
+            - category: 데이터
+              tech: ScriptableObject · TSV
+              purpose: 리플렉션 제네릭 파서로 기획 데이터를 코드와 분리
+            - category: 빌드 자동화
+              tech: Jenkins
+              purpose: 1시간 주기 폴링 → 배치 모드 빌드 → exit 코드 판정
+    - badge: 구성요소
+      title: 5계층 아키텍처 — 단방향 흐름
+      blocks:
+        - type: layers
+          components: >-
+            입력 · 액터 · 전투 코어 · 데이터(MVVM) · UI·월드 다섯 계층으로 이루어집니다. 입력은 `InputManager`,
+            액터는 FSM 플레이어와 BT 몬스터, 전투 코어는 `CombatSystem` 레지스트리와 이벤트 큐, 데이터는
+            MVVM + `Observable<T>`, 표현은 UI·월드입니다.
+          relations: >-
+            하위 계층은 상위 계층을 직접 참조하지 않습니다. 애니메이터는 대상이 플레이어인지 몬스터인지 모른 채
+            `IAttackAble`만 호출하고, UI는 `Observable`만 구독합니다. 액터·판정·데이터 세 축이 모두 인터페이스 계약에 의존합니다.
+          flow: >-
+            입력 → 상태 → 전투 → 데이터 → UI 한 방향으로 흐르고, 역방향(피격·UI 갱신)은
+            전부 `event` · `Observable<T>`로 통신합니다.
+          layers:
+            - name: 입력 계층 · INPUT
+              note: 디바이스 → 의미 이벤트
+              items:
+                - name: PlayerInput.inputactions
+                - name: InputManager
+            - name: 액터 계층 · ACTOR
+              note: FSM 플레이어 · BT 몬스터
+              items:
+                - name: PlayerStateMachine
+                  emphasis: true
+                - name: IState ×9
+                - name: EnemyAIBase
+                - name: EnemyState · BossState
+                - name: BtNode 트리
+                  kind: dashed
+            - name: 전투 코어 · COMBAT
+              note: 레지스트리 + 이벤트 큐 · 프레임당 10건
+              items:
+                - name: CombatSystem
+                  emphasis: true
+                - name: AttackTiming · SkillTiming
+                - name: PlayerWeapon · EnemyWeapon
+                - name: InGameEvent 계층
+                  kind: dashed
+            - name: 데이터 계층 · MVVM
+              note: Model · ViewModel · View · Observable
+              items:
+                - name: FighterView
+                - name: FighterViewModel
+                - name: 'Observable<T>'
+                - name: FighterStats · SO
+                  kind: dashed
+            - name: UI · 월드 계층 · PRESENTATION
+              note: 구독으로만 갱신 · 트리거 상호작용
+              items:
+                - name: HP · Stamina Slider
+                - name: UI_Inventory
+                - name: LockOn Indicator
+                - name: BoneFire · BossWall
+    - badge: 관계
+      title: 핵심 인터페이스 계약 · Class Diagram
+      lede: >-
+        액터·판정·데이터 **세 축이 모두 인터페이스에 의존**합니다. 애니메이터는 대상이 플레이어인지 몬스터인지
+        모른 채 `IAttackAble`만 호출하고, UI는 `Observable`만 구독합니다.
+      blocks:
+        - type: mermaid
+          question: 액터·판정·AI 세 축은 각각 무슨 계약에 의존하고 누가 구현하나?
+          source: |
+            classDiagram
+                class IState {
+                    <<interface>>
+                    +Enter()
+                    +UpdateLogic()
+                    +Exit()
+                }
+                class WalkState
+                class SprintState
+                class RollState
+                class AttackState
+                class HitState
+                IState <|.. WalkState
+                IState <|.. SprintState
+                IState <|.. RollState
+                IState <|.. AttackState
+                IState <|.. HitState
+
+                class IAttackAble {
+                    <<interface>>
+                    +AttackForCollEnable()
+                    +AttackForCollDisEnable()
+                }
+                class ISkillAble {
+                    <<interface>>
+                }
+                class PlayerStateMachine
+                class EnemyState
+                class BossState
+                IAttackAble <|.. PlayerStateMachine
+                IAttackAble <|.. EnemyState
+                IAttackAble <|.. BossState
+                ISkillAble <|.. EnemyState
+                ISkillAble <|.. BossState
+
+                class EnemyAIBase {
+                    <<abstract>>
+                    +ConstructBehaviorTree()
+                }
+                class SkeletonAI
+                class BossMonsterAI
+                EnemyAIBase <|-- SkeletonAI
+                EnemyAIBase <|-- BossMonsterAI
+    - badge: 흐름
+      title: 런타임 부팅 순서 — Awake → Start → Update
+      lede: >-
+        `CombatSystem.Instance`는 `Awake`에서 할당되고 `FighterView.Start`에서 사용됩니다.
+        즉 **싱글턴 할당이 등록보다 반드시 먼저** 일어나야 하는 초기화 체인입니다.
+      blocks:
+        - type: points
+          variant: numbered
+          columns: 2
+          items:
+            - tag: '1'
+              title: Awake · CombatSystem
+              body: '`Instance = this`. FighterView는 ViewModel 생성 + 슬라이더 구독, PlayerStateMachine·AI는 참조 캐싱'
+            - tag: '2'
+              title: Start · FighterView 등록
+              body: '`CombatSystem.RegisterFighter(this)` → `fightersDict[mainModelCollider] = view`'
+            - tag: '3'
+              title: Start · 상태 · 트리 기동
+              body: 'PSM은 입력·FighterView 구독 후 `ChangeState(new WalkState)`, AI는 `ConstructBehaviorTree()`'
+            - tag: '4'
+              title: Update 루프
+              body: 'PSM은 현재 상태 `UpdateLogic()`, AI는 `_rootNode.Evaluate()`, CombatSystem은 큐에서 최대 10건 처리'
+    - badge: 설계 원칙
+      title: 반복되는 세 가지 규칙
+      blocks:
+        - type: points
+          variant: numbered
+          columns: 3
+          items:
+            - tag: '01'
+              title: 단방향 계층
+              body: 하위 계층은 상위를 직접 참조하지 않는다
+            - tag: '02'
+              title: 역통신은 이벤트
+              body: '되돌아가는 신호는 `event` · `Observable`로만'
+            - tag: '03'
+              title: 인터페이스 계약
+              body: 구체 타입이 아니라 계약에만 의존
+features:
+  - title: 입력 · 플레이어 FSM
+    intro: >-
+      입력은 **디바이스 → 의미 → 소비자**의 2단 릴레이를 거치고, 플레이어는 매 전이마다 `new`로 생성되는
+      순수 C# 상태 객체로 움직입니다. **PlayerStateMachine**이 컨텍스트 겸 파사드입니다.
+    parts:
+      - badge: 핵심 동작
+        title: 입력 2단 릴레이 — 상태가 InputManager를 모른다
+        blocks:
+          - type: points
+            variant: flow
+            items:
+              - tag: 1단 · 디바이스 → 의미
+                title: InputManager
+                body: 'Input System 저수준 콜백을 `OnLMBInput` · `OnSpaceBarInput` 같은 **의미 있는 C# 이벤트**로 변환'
+              - tag: 2단 · 재방송
+                title: PlayerStateMachine
+                body: '일부를 `OnLMBAction` · `OnRInput`으로 **다시 방송** — 상태·월드는 이 파사드만 구독'
+              - tag: 소비자
+                title: 상태 · 월드 · 카메라
+                body: '`WalkState` · `BoneFire`는 플레이어를, `CameraControl`은 InputManager를 직접 구독'
+          - type: callout
+            badge: 캡슐화
+            tone: white
+            body: 구독/해제가 상태의 `Enter()` / `Exit()`에서 자연스럽게 캡슐화됩니다.
+      - badge: FSM
+        title: 상태 전이 — WalkState 허브
+        blocks:
+          - type: mermaid
+            question: 플레이어 상태는 WalkState 허브에서 어떤 조건으로 전이하고, 피격·사망은 어디서 진입하나?
+            source: |
+              stateDiagram-v2
+                  [*] --> WalkState
+                  WalkState --> SprintState: Space 홀드 0.3s↑
+                  WalkState --> RollState: Space 탭 + 이동
+                  WalkState --> BackStepState: Space 탭 + 정지
+                  WalkState --> AttackState: 좌클릭 · 3타 콤보
+                  WalkState --> FallState: IsGrounded 실패
+                  SprintState --> WalkState
+                  RollState --> WalkState
+                  BackStepState --> WalkState
+                  AttackState --> WalkState: 콤보 종료
+                  FallState --> WalkState: 착지
+                  WalkState --> HitState: OnTakeDamage
+                  HitState --> WalkState
+                  WalkState --> DieState: OnDied
+                  DieState --> [*]
+          - type: image
+            src: ../../assets/soulslike/soul-animator.png
+            variant: aside
+            width: 372
+            label: ANIMATOR
+            caption: >-
+              실제 플레이어 Animator — **Blend Tree**를 허브로 Attack1·2·3, Rolling, Backstep, GetHit, Land
+              상태가 연결됩니다. FSM의 각 상태 클래스가 이 클립들을 `CrossFade`로 재생합니다.
+      - badge: 분기
+        title: Space 한 키로 3가지 행동
+        lede: >-
+          타이머는 `WalkState`의 로컬 필드이며 `Exit()`에서 0으로 초기화됩니다.
+          홀드 시간과 이동 여부를 조합해 하나의 키를 세 갈래로 나눕니다.
+        blocks:
+          - type: points
+            columns: 3
+            items:
+              - title: 홀드 0.3s↑ → SprintState
+                body: Space를 계속 누르는 동안 스프린트. 스태미나 고갈이나 키 해제 시 Walk 복귀
+              - title: 탭 + 이동 → RollState
+                body: '`MoveAmount > 0`이면 구르기. **Enter에서 무적**(ActiveInvisible)'
+              - title: 탭 + 정지 → BackStepState
+                body: 정지 상태에서 탭하면 뒤로 회피. 애니 90%에서 Walk 복귀
+      - badge: 콤보
+        title: 3타 콤보 — 애니 90% 지점 판정
+        lede: 각 클립의 **애니 90% 지점**에서 다음 타 선입력을 판정해 콤보를 잇습니다.
+        blocks:
+          - type: chips
+            variant: state
+            items:
+              - { label: Attack1, arrow: → }
+              - { label: Attack2, tone: current, arrow: → }
+              - { label: Attack3, tone: current, arrow: → }
+              - { label: WalkState }
+          - type: callout
+            badge: 미묘
+            tone: white
+            body: >-
+              `ThirdAttackReady`는 `_animationPlayed == true`일 때만 플래그를 세웁니다. 즉
+              **2타 모션이 시작된 이후의 클릭만** 3타로 이어집니다 — 1타 도중 연타는 3타를 예약하지 않습니다.
+      - badge: 스태미나
+        title: 소모 · 회복 · 탈진 락
+        blocks:
+          - type: chips
+            variant: state
+            items:
+              - { label: Roll · BackStep · Attack · Sprint, arrow: → }
+              - { label: StaminaChange (가산), tone: current, arrow: → }
+              - { label: 0 도달 → OnStaminaZero, tone: dead, arrow: → }
+              - { label: 탈진 락 · 회복 중단 }
+          - type: callout
+            badge: 계약
+            tone: tint
+            body: >-
+              `StaminaChange()`는 값을 **가산**합니다. 따라서 인스펙터의 `rollStamina` · `attackStamina`는
+              **반드시 음수**여야 소모로 동작합니다. 탈진 락은 `_noStamina`가 `staminaRegenRateTime` 경과 후
+              풀리는, 소울라이크 특유의 페널티입니다.
+    decisions: []
+  - title: 전투 · MVVM
+    intro: >-
+      모든 피해·회복은 **CombatSystem** 싱글턴의 이벤트 큐를 거쳐 결정론적으로 처리되고,
+      체력·스태미나 UI는 `Observable<T>`를 구독하는 MVVM으로만 갱신됩니다.
+    parts:
+      - badge: 핵심 동작
+        title: 이벤트 큐 — 프레임당 10건
+        lede: >-
+          무기의 `OnTriggerEnter`는 피해를 즉시 적용하지 않고 큐에 쌓습니다.
+          `Update`가 **프레임당 최대 10건**만 처리해 순서를 결정론적으로 만들고 부하를 분산합니다.
+        blocks:
+          - type: mermaid
+            question: 전투 이벤트는 어떤 생산자에서 큐로 쌓이고 프레임당 어떻게 소비되나?
+            source: |
+              flowchart TD
+                  P["생산자 · PlayerWeapon · EnemyWeapon · BossSkill · Heal"] -->|"AddInGameEvent()"| Q["이벤트 큐 · _eventQueue"]
+                  Q -->|"Update · 프레임당 ≤ 10건"| D["Dequeue · switch(e.Type)"]
+                  D -->|Combat| C["Receiver.TakeDamage"]
+                  D -->|Heal| H["Receiver.TakeHeal"]
+                  C --> V["수신자 · FighterView"]
+                  H --> V
+          - type: code
+            api: CombatSystem.cs · Update()
+            code: |-
+              private const int Max_Event_Count = 10;
+
+              void Update()
+              {
+                  int processCount = 0;
+                  while (_eventQueue.Count > 0 && processCount < Max_Event_Count)
+                  {
+                      InGameEvent e = _eventQueue.Dequeue();
+                      switch (e.Type)
+                      {
+                          case EventType.Combat: e.Receiver.TakeDamage((CombatEvent)e); break;
+                          case EventType.Heal:   e.Receiver.TakeHeal((HealthEvent)e);  break;
+                      }
+                      processCount++;
+                  }
+                  // 남은 이벤트는 다음 프레임으로 이월 — 한 프레임 부하 상한
+              }
+            notes:
+              - at: Max_Event_Count
+                why: 프레임당 처리량을 10건으로 제한한다. 남은 이벤트는 다음 프레임으로 이월돼 한 프레임 부하 상한이 된다.
+              - at: while 가드
+                why: 무기의 OnTriggerEnter가 즉시 적용하지 않고 큐를 거치므로, 큐가 비거나 10건을 채울 때까지 순서대로 처리해 결정론을 유지한다.
+              - at: switch (e.Type)
+                why: InGameEvent를 CombatEvent·HealthEvent로 다운캐스트해 수신자(FighterView)의 TakeDamage·TakeHeal로 분기한다.
+      - badge: 이벤트
+        title: InGameEvent 타입 계층
+        blocks:
+          - type: mermaid
+            question: 전투 이벤트는 어떤 공통 계약을 상속해 피해·회복으로 갈라지나?
+            source: |
+              classDiagram
+                  class InGameEvent {
+                      <<abstract>>
+                      +FighterView Sender
+                      +FighterView Receiver
+                      +EventType Type
+                  }
+                  class CombatEvent {
+                      +float Damage
+                      +Vector3 HitPosition
+                      +Collider Collider
+                  }
+                  class HealthEvent {
+                      +float HealAmount
+                  }
+                  InGameEvent <|-- CombatEvent
+                  InGameEvent <|-- HealthEvent
+          - type: callout
+            badge: 예약
+            tone: white
+            body: '`HitPosition` · `Collider`는 히트 이펙트·데칼 스폰을 위한 예약 필드입니다.'
+      - badge: MVVM
+        title: Observable<T> — 잦은 UI 변경을 낮은 결합으로
+        blocks:
+          - type: table
+            headers: [계층, 클래스, 책임, Unity 의존]
+            rows:
+              - [Model, FighterStats · SO, 최대 체력·스태미나 · 힘·민첩·방어, 데이터만]
+              - [ViewModel, FighterViewModel, 체력·스태미나 규칙 · 사망·페이즈 판정, 없음]
+              - [View, FighterView, 슬라이더 갱신 · 콜라이더 토글 · 이벤트 중계, 있음]
+              - [바인딩, 'Observable<T>', 값 변경 감지 + 통지, 없음]
+          - type: prose
+            paragraphs:
+              - '`FighterViewModel`이 `MonoBehaviour`를 상속하지 않는 것이 핵심입니다 — 전투 규칙이 **씬 없이도 테스트 가능한 순수 객체**로 분리됩니다.'
+          - type: code
+            api: Observable.cs · 값 변경 통지 + 구독 즉시 동기화
+            code: |-
+              public T Value
+              {
+                  get => _value;
+                  set
+                  {
+                      // 같은 값이면 통지하지 않음 — 중복 갱신 차단
+                      if (EqualityComparer<T>.Default.Equals(_value, value)) return;
+                      _value = value;
+                      OnValueChanged?.Invoke(_value);
+                  }
+              }
+
+              public void Subscribe(Action<T> listener)
+              {
+                  OnValueChanged += listener;
+                  listener?.Invoke(_value);   // 구독 즉시 현재값 1회 전달 → 초기화 코드 불필요
+              }
+            notes:
+              - at: Equals 가드
+                why: 같은 값이면 통지하지 않아 중복 UI 갱신을 막는다.
+              - at: Subscribe 즉시 Invoke
+                why: 구독하는 순간 현재값을 1회 전달해 초기화 코드를 없앤다 — 뷰가 최신 값으로 바로 동기화된다.
+      - badge: 판정
+        title: 애니메이션 주도 히트박스
+        lede: >-
+          히트박스 활성 타이밍을 코드 타이머가 아니라 **애니메이션 클립 자체**가 소유합니다.
+          `AttackTiming`(StateMachineBehaviour)이 정규화 시간에 `IAttackAble`을 호출하고, 한 번의 휘두름에서
+          같은 대상을 두 번 때리지 않도록 `HashSet<FighterView>`로 막습니다.
+        blocks:
+          - type: chips
+            variant: state
+            items:
+              - { label: startTime 통과 → 콜라이더 ON, tone: current, arrow: → }
+              - { label: 충돌 → _damaged에 없으면 이벤트, arrow: → }
+              - { label: endTime 통과 → OFF + _damaged.Clear(), tone: current, arrow: → }
+              - { label: 다음 타에서 재타격 허용 → 콤보 성립 }
+          - type: table
+            headers: [주체, 대미지 산식]
+            rows:
+              - ['플레이어', 'stat.Damage + str×StrengthBonus()/2 + dex×DexterityBonus()/2']
+              - ['일반 몬스터', 'attackData[0].damage (고정)']
+              - ['보스 스킬', 'attackData.damage (프리팹별 SO)']
+          - type: callout
+            badge: 관찰
+            tone: white
+            body: >-
+              `GetFighter()`는 `fightersDict[coll]` 인덱서를 그대로 씁니다. 미등록 콜라이더가 들어오면 `null`이
+              아니라 !!KeyNotFoundException!!이 발생 — 호출부의 `if (player != null)`는 도달하지 못하는 방어
+              코드입니다. ==TryGetValue로 바꾸면 계약이 일치==합니다.
+    decisions: []
+  - title: 적 AI · 행동 트리
+    intro: >-
+      상태가 늘수록 전이 조건이 폭발하는 상태 패턴 대신, **항상 트리 구조를 유지하는 행동 트리**를 재귀
+      `Evaluate()`로 구현했습니다. 플레이어는 FSM, 몬스터는 BT를 쓰는 **의도적 비대칭**입니다 —
+      몬스터는 "상황 판단 + 확률적 행동 선택"이 필요하기 때문입니다.
+    parts:
+      - badge: 노드 체계
+        title: BtNode — 조합 4종 · 리프 10종
+        lede: >-
+          모든 노드는 `BtNode`를 상속해 `Evaluate()` 하나로 재귀 평가됩니다.
+          조합 노드 4종(Selector · Selector_Random · Sequence · Sequence_Memory)과 리프 노드 10종으로 이루어집니다.
+        blocks:
+          - type: mermaid
+            question: 행동 트리 노드는 무슨 계약을 공유하고 조합·리프로 어떻게 갈라지나?
+            source: |
+              classDiagram
+                  class BtNode {
+                      <<abstract>>
+                      #NodeState State
+                      #List~BtNode~ Children
+                      +Evaluate() NodeState
+                  }
+                  class Selector
+                  class Selector_Random
+                  class Sequence
+                  class Sequence_Memory
+                  class Leaf_WatchPlayer
+                  class Leaf_Chase
+                  class Leaf_PerformAttack
+                  class Leaf_Cleaner
+                  BtNode <|-- Selector
+                  BtNode <|-- Selector_Random
+                  BtNode <|-- Sequence
+                  BtNode <|-- Sequence_Memory
+                  BtNode <|-- Leaf_WatchPlayer
+                  BtNode <|-- Leaf_Chase
+                  BtNode <|-- Leaf_PerformAttack
+                  BtNode <|-- Leaf_Cleaner
+      - badge: 평가 규칙
+        title: Selector(OR) vs Sequence(AND)
+        blocks:
+          - type: points
+            columns: 2
+            items:
+              - title: Selector — 우선순위 (OR)
+                body: >-
+                  자식을 순서대로 평가하다 **하나라도 Success/Running**이면 즉시 그 결과 반환.
+                  **전부 Failure**여야 Failure. → 첫 성공 분기를 고르는 우선순위 스위치
+              - title: Sequence — 연속 행동 (AND)
+                body: >-
+                  자식을 순서대로 평가하다 **하나라도 Failure**면 즉시 중단. 전부 통과해야 Success.
+                  → 조건·행동을 한 줄로 잇는 시퀀스
+      - badge: 핵심 이슈
+        title: 콤보가 끊기는 버그 — Sequence → Sequence_Memory
+        blocks:
+          - type: before-after
+            before:
+              label: 문제 · 매 프레임 처음부터 재평가
+              items:
+                - 적이 콤보 도중 플레이어가 사거리를 벗어나면 `Sequence`가 매 프레임 앞 조건(CheckAttackRange)부터 재평가해 실패
+                - 진행 중이던 콤보가 !!즉시 끊긴다!!
+            after:
+              label: 해결 · 실행 위치를 기억
+              items:
+                - '`_lastRunningChildIndex`로 Running이던 자식 인덱스를 기억'
+                - 다음 프레임에 그 자리에서 재개 — 진입 조건을 다시 통과할 필요 없이 진행 중인 타부터 이어짐
+            lesson: >-
+              3타 콤보·후퇴 시퀀스 등 **중단되면 안 되는 연속 행동**은 전부 ==Sequence_Memory==로 조립했고,
+              순수 조건 검사만 필요한 곳은 기존 `Sequence`를 유지합니다.
+          - type: code
+            api: Selector.cs · Sequence_Memory.Evaluate()
+            code: |-
+              public override NodeState Evaluate()
+              {
+                  // 이전 평가가 Running이 아니었다면 처음부터
+                  if (State != NodeState.Running) _lastRunningChildIndex = 0;
+
+                  for (int i = _lastRunningChildIndex; i < Children.Count; i++)
+                  {
+                      switch (Children[i].Evaluate())
+                      {
+                          case NodeState.Failure:
+                              _lastRunningChildIndex = 0;
+                              return State = NodeState.Failure;
+                          case NodeState.Running:
+                              _lastRunningChildIndex = i;   // 실행 위치 기억 → 다음 프레임 재개
+                              return State = NodeState.Running;
+                          case NodeState.Success:
+                              continue;                     // 다음 자식으로
+                      }
+                  }
+                  _lastRunningChildIndex = 0;
+                  return State = NodeState.Success;
+              }
+            notes:
+              - at: State != Running 가드
+                why: 이전 평가가 Running이 아니면 인덱스를 0으로 되돌려 처음부터 평가한다. Running이었으면 기억한 위치에서 재개한다.
+              - at: _lastRunningChildIndex = i
+                why: Running인 자식의 위치를 기억해 다음 프레임에 그 자리에서 이어간다. 앞 조건을 다시 통과할 필요가 없어 콤보가 끊기지 않는다.
+              - at: Success → continue
+                why: 성공한 자식은 건너뛰고 다음 자식으로 넘어간다. 전부 성공해야 시퀀스가 Success다.
+          - type: callout
+            badge: 부수효과
+            tone: white
+            body: >-
+              **걷기 애니 버그**도 같은 계열입니다 — 정지 상태에서 `Vertical`이 1로 남아 걷기 모션이 재생됐습니다.
+              애니 파라미터·NavMeshAgent를 0으로 되돌리고 항상 Success를 반환하는 ==Leaf_Cleaner==를
+              시퀀스 중간에 삽입해 상태를 정리했습니다.
+      - badge: 카탈로그
+        title: 리프 노드 — 반환 규칙과 부수효과
+        blocks:
+          - type: table
+            headers: [노드, 반환 규칙, 부수효과]
+            rows:
+              - [Leaf_WatchPlayer, 시야각·거리·레이캐스트 통과 → Success, '**findPlayer = true** (래치)']
+              - [Leaf_CheckAttackRange, 거리 ≤ range → Success, 없음 (순수 조건)]
+              - [Leaf_CheckSkillAble, secondPhase && !skillCool → Success, '!!skillCool = true!!']
+              - [Leaf_Cleaner, 항상 Success, 애니 0 · agent 정지·경로 리셋]
+              - [Leaf_Chase, 3초 경과 → Success · 그전엔 Running, SetDestination · Vertical = 1]
+              - [Leaf_PerformAttack, 선딜·타격·후딜 전체 경과 → Success, 애니 CrossFade · 루트모션/전진]
+      - badge: 트리
+        title: BossMonsterAI 행동 트리
+        lede: >-
+          `skillOrCombo`가 **Selector**이므로 스킬 시퀀스가 항상 먼저 시도되고,
+          (사거리 밖 · 1페이즈 · 쿨다운) 중 하나로 실패하면 근접 교전으로 넘어갑니다.
+        blocks:
+          - type: mermaid
+            question: 보스는 스킬과 근접 교전을 어떤 우선순위로 고르고 접근은 어떻게 처리하나?
+            source: |
+              flowchart TD
+                  A["actions · Selector"] --> B["skillOrCombo · Selector"]
+                  A --> E["randomOutAction · Selector_Random · 접근"]
+                  B --> C["skillUseSequence · Seq_Memory · 2페이즈"]
+                  B --> D["근접 교전 · Seq_Memory"]
+                  C --> C1["CheckRange@skill → CheckSkillAble → Cleaner → 스킬 2종 랜덤"]
+                  D --> D1["CheckRange → Cleaner → comboOrStrafe · Selector_Random"]
+                  D1 --> D2["3타 콤보 · 2타 콤보 · Strafe · BackMove→Wait"]
+                  E --> E1["walkCheck→Chase→Wait · Strafe"]
+          - type: callout
+            badge: 래치
+            tone: tint
+            body: >-
+              스켈레톤은 `Leaf_WatchPlayer`로 발견을 판정하고, 한 번 발견하면 `findPlayer` 래치가 유지돼
+              **시야에서 벗어나도 어그로가 풀리지 않습니다**. 해제는 화톳불 `Respawn()`에서만 —
+              "발각되면 끝까지 쫓아온다"는 소울라이크 특성과 일치합니다. 보스는 `BossWall`로 입장을 통제하므로
+              이 판정 자체가 없습니다.
+    decisions:
+      - title: 몬스터 AI 구조 — 상태 머신(FSM) vs 행동 트리(BT)
+        options:
+          - { key: A, title: FSM (플레이어와 동일) }
+          - { key: B, title: 행동 트리 (BT), chosen: true }
+        criteria:
+          - label: 상태 증가 대응
+            values:
+              - 상태가 늘수록 전이 조건이 조합적으로 폭발
+              - 항상 트리 구조를 유지 · 노드 추가로 확장
+          - label: 행동 선택
+            values:
+              - 입력에 따른 명시적 전이만
+              - 상황 판단 + 확률적 선택(Selector_Random)
+          - label: 재사용
+            values:
+              - 상태 클래스가 액터별로 묶임
+              - 리프 노드를 조합해 트리를 재조립
+        reason: >-
+          플레이어는 입력이 곧 명시적 상태 전이라 FSM이 맞지만, 몬스터는 "상황 판단 + 확률적 행동 선택"이
+          필요해 BT를 선택했습니다. 같은 액터 계층 안에서 플레이어는 FSM, 몬스터는 BT를 쓰는 **의도적 비대칭**입니다.
+  - title: 보스 · 카메라 · 월드
+    intro: >-
+      보스는 체력 절반에서 **2페이즈**로 전환되고, 카메라·락온은 **LateUpdate 순서**로 배치되며,
+      화톳불·보스방은 **트리거 구독**만으로 상호작용합니다.
+    parts:
+      - badge: 2페이즈
+        title: 체력 50% 트리거와 스킬 쿨다운
+        blocks:
+          - type: chips
+            variant: state
+            items:
+              - { label: CurrentHealth ≤ Max / 2, arrow: → }
+              - { label: OnSecondPhase 발행, tone: current, arrow: → }
+              - { label: secondPhase = true · 파티클 ON, arrow: → }
+              - { label: 스킬 분기 개방, tone: dead }
+          - type: chips
+            variant: loop
+            items:
+              - { label: 스킬 가능, arrow: → }
+              - { label: skillCool = true · 발동, arrow: → }
+              - { label: ≥ 15초 → skillCool = false, arrow: ⟳ }
+          - type: callout
+            badge: 시점
+            tone: white
+            body: >-
+              `skillCool`은 애니메이션 완료가 아니라 **조건 검사 통과 즉시** true가 됩니다. 즉 15초 쿨다운에
+              시전 시간이 포함되어, 실제 재사용 간격은 `15초 − (선딜+타격+후딜)`입니다. `OnSecondPhase`는
+              절반 이하 모든 피격마다 반복 발행되지만 수신 측이 멱등해 문제되지 않습니다.
+      - badge: 카메라
+        title: 락온 — LateUpdate 순서가 중요하다
+        lede: >-
+          `HandleCamera`(Update)가 마우스 델타로 yaw·pitch를 만들고, LateUpdate가 위치→회전→충돌 순으로
+          확정합니다. `CameraCollision`이 피벗 위치·회전 기준으로 SphereCast를 쏘므로 FollowPlayer·LockOn이
+          확정된 뒤에 실행되어야 합니다.
+        blocks:
+          - type: points
+            variant: numbered
+            columns: 3
+            items:
+              - { tag: '1', title: FollowPlayer, body: Lerp 추적 + 락온 높이 오프셋 }
+              - { tag: '2', title: LockOnCamControl, body: 타겟 방향 회전 · 인디케이터 }
+              - { tag: '3', title: CameraCollision, body: SphereCast로 벽 감지 · SmoothDamp }
+          - type: points
+            columns: 3
+            items:
+              - title: 토글 락온
+                body: 휠 클릭 → OverlapSphere로 최근접 타겟, 재클릭 시 해제
+              - title: 자동 해제
+                body: 몬스터 사망 → LockOnTarget 비활성 → 다음 프레임 UnlockOn
+              - title: Q/E 전환
+                body: '**스크린 공간** 좌/우 차로 다음 타겟 — 화면에서 보는 방향과 일치'
+          - type: callout
+            badge: 무참조
+            tone: tint
+            body: '`EnemyState.Dead()`와 `LockOnCamControl`은 서로를 직접 참조하지 않고, **LockOnTarget의 활성 상태만으로** 통신합니다.'
+      - badge: 월드
+        title: 화톳불과 보스방 진행도 게이팅
+        blocks:
+          - type: points
+            columns: 2
+            items:
+              - title: BoneFire · 화톳불
+                body: >-
+                  세이브 포인트 — 트리거 진입 시 `OnRInput`을 구독하고, R 키에 **완전 회복 + 몬스터 전체 리스폰**
+                  (findPlayer 해제)을 수행. "범위 안인지" 폴링 없이 **구독/해제**로 상호작용을 표현합니다.
+              - title: BossWall · 보스방
+                body: >-
+                  R 키로 입장 컷신 → 도착 시 **보스 활성 + 벽 재봉인**(전투 중 이탈 불가).
+                  보스 사망이 `Destroy(bossWall)` + 화톳불 개방을 한 번에 처리합니다.
+          - type: chips
+            variant: state
+            items:
+              - { label: 보스방 외부 · 벽 활성, arrow: → }
+              - { label: 입장 컷신 · R 키, arrow: → }
+              - { label: 보스전 · 벽 재봉인, tone: dead, arrow: → }
+              - { label: 클리어 · 벽 파괴 + 화톳불, tone: current }
+    decisions: []
+  - title: 데이터 · 빌드
+    intro: >-
+      기획 데이터는 **리플렉션 제네릭 파서**로 코드와 분리하고,
+      빌드는 **Jenkins**가 폴링부터 exit 코드까지 자동화합니다.
+    parts:
+      - badge: 데이터
+        title: TSV 파이프라인 — 리플렉션 제네릭 파서
+        blocks:
+          - type: chips
+            variant: state
+            items:
+              - { label: TSV .txt (에디터 타임), arrow: → }
+              - { label: DatabaseBase · SO, arrow: → }
+              - { label: 'TSVImporter.Parse<T> (버튼 클릭)', tone: current, arrow: ⇒ }
+              - { label: 'List<T> · SetDirty (저장)', tone: current }
+          - type: prose
+            paragraphs:
+              - >-
+                헤더 이름과 C# 필드 이름이 **일치하면 자동 매핑**되고, 열 순서는 무관하며 없는 열은 조용히
+                무시됩니다. 파싱 예외는 **필드 단위로 격리**되어 한 셀이 잘못돼도 나머지는 살아남습니다.
+          - type: callout
+            badge: 확장
+            tone: tint
+            body: >-
+              `[CustomEditor(typeof(DatabaseBase), true)]`의 **true 인자** 덕분에 `DatabaseBase`를 상속한
+              **모든 자식 SO가 자동으로 로드 버튼**을 갖습니다. 새 DB 타입을 추가해도 에디터 코드를 건드릴 필요가 없습니다.
+      - badge: 빌드
+        title: Jenkins CI — 폴링에서 exit 코드까지
+        blocks:
+          - type: chips
+            variant: state
+            items:
+              - { label: GitHub, arrow: → }
+              - { label: Jenkins (1시간 주기 폴링), arrow: → }
+              - { label: BuildAuto.Build(), tone: current, arrow: → }
+              - { label: Exit(0 / 1), tone: current }
+          - type: table
+            headers: [설정, 값]
+            rows:
+              - [출력 경로, Builds/StandaloneWindows64/SoulLike.exe]
+              - [타겟, BuildTarget.StandaloneWindows64]
+              - [씬 소스, EditorBuildSettings.scenes 중 enabled만]
+          - type: callout
+            badge: 핵심
+            tone: white
+            body: >-
+              CI 연동의 핵심은 `EditorApplication.Exit(코드)`입니다. Jenkins는 프로세스 **종료 코드로 성공/실패를
+              판단**하므로, 명시적 exit 코드 없이는 빌드 실패가 CI에 전달되지 않습니다.
+    decisions: []
+decisions: []
+retrospective:
+  parts:
+    - badge: 만족
+      title: 만족스러운 부분
+      blocks:
+        - type: points
+          variant: numbered
+          columns: 2
+          items:
+            - tag: '01'
+              title: 긴장감 있는 AI
+              body: 단순 추격·공격만 하던 몬스터를 **공격 템포를 조절하는 긴장감 있는 AI**로 발전시켰습니다.
+            - tag: '02'
+              title: 이벤트 하나로 2페이즈
+              body: '**MVVM의 느슨한 결합** 덕분에 이벤트 하나로 보스 2페이즈(공격 패턴 개방 + 파티클)를 깔끔히 연동할 수 있었습니다.'
+  # 아쉬웠던 점·깨달은 점(디자인 07)을 남은 기술 부채로, 다음 계획을 개선 계획으로 옮겼다.
+  debt:
+    - >-
+      `Sequence`와 `Selector` 모두 노드가 중단될 때 정리할 표준 방법이 없어 같은 원인의 문제를 겪었다.
+      `Sequence_Memory`와 `Cleaner`로 각각 대응했지만, 중단 시 상태 정리가 노드 계약에 표준화돼 있지 않다.
+    - >-
+      행동 트리의 문제 지점을 코드로만 추적하다 늦게 발견했다. 기술 문서를 위해 그린 다이어그램에서야 한눈에
+      보였다 — 도식화하며 디버깅했다면 시간을 크게 줄였을 것이다.
+    - 노드를 `enum`으로 분류만 했을 뿐 트리 구조 자체를 데이터 테이블화하지 못했다. AI 패턴을 바꾸려면 여전히 코드를 수정해야 한다.
+  plan:
+    - >-
+      **완전한 데이터 주도 구조**로 확장한다. 개발 편의뿐 아니라 다른 파트 개발진과의 협업을 위해서라도
+      필수라 보고 적극 적용할 계획이다.
+    - '**비선형 자료구조는 설계 단계에서 미리 도식화**한 뒤 구현한다. 시각화가 디버깅 시간을 줄인다는 것을 이번에 확인했다.'
+    - 다음 BT에는 `conditional abort`(매 프레임 상위 조건을 재평가하고, 조건이 바뀌면 Running 중인 하위 노드를 정리)를 구현한다.
