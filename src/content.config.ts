@@ -558,7 +558,12 @@ function partSchema(image: ImageFn) {
      * 제목(그 안에서 무슨 판단)을 나눈다. 없으면 제목만 h3 로 낸다.
      */
     badge: z.string().min(1).optional(),
-    title: z.string().min(1),
+    /**
+     * 꼭지 제목. **선택이다.** 한 기능을 통째로 한 섹션으로 낼 때는 제목이 섹션 헤더에 이미 있어
+     * 꼭지 제목이 군더더기가 된다 — 그럴 땐 비우면 [slug] 가 제목 줄을 통째로 뺀다(제목 없는 본문 꼭지).
+     * (features 배열을 기능별 섹션으로 쪼갤 때 쓴다. 여러 꼭지로 나뉘는 섹션은 여전히 제목·배지로 구분한다.)
+     */
+    title: z.string().min(1).optional(),
     /** 제목 아래 한 줄 설명. 두 디자인 모두 거의 모든 꼭지에 달고 있다. */
     lede: z.string().optional(),
     blocks: z.array(makeDocBlock(image)).min(1),
@@ -763,7 +768,7 @@ const projectDocs = defineCollection({
     for (const g of groups) {
       for (const part of g.parts) {
         for (const block of part.blocks) {
-          if (block.type === 'table') checkTable(block, `${g.title} › ${part.title}`, ctx);
+          if (block.type === 'table') checkTable(block, `${g.title} › ${part.title ?? '본문'}`, ctx);
         }
       }
     }

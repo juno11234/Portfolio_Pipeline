@@ -134,9 +134,12 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
           )}
           {section.parts.map((part, pi) => (
             <>
-              {part.badge !== undefined
-                ? <PartTitle badge={part.badge} title={part.title} margin={partMargin(pi)} />
-                : <h3 class="ph3" style={`margin:${partMargin(pi)}`}>{part.title}</h3>}
+              {/* 제목 없는 꼭지(기능=섹션)는 제목 줄을 통째로 뺀다 — 섹션 헤더가 이미 제목이다. */}
+              {(part.title !== undefined || part.badge !== undefined) && (
+                part.badge !== undefined
+                  ? <PartTitle badge={part.badge} title={part.title} margin={partMargin(pi)} />
+                  : <h3 class="ph3" style={`margin:${partMargin(pi)}`}>{part.title}</h3>
+              )}
               {part.lede !== undefined && <p class="plede" set:html={rich(part.lede)} />}
               {part.blocks.map((block) => <DocBlock block={block} />)}
             </>

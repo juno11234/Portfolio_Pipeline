@@ -194,10 +194,11 @@ architecture:
 
 # ── ③ 핵심 기능 ───────────────────────────────────────────────────────────
 features:
-  - title: 핵심 기능
+  # 핵심 기능을 기능별 섹션으로 나눴다(가독성 — 사용자 요청). 각 기능이 하나의 섹션이 된다.
+  # 꼭지 제목은 비운다 — 섹션 헤더가 이미 제목이라(partSchema.title 을 optional 로 열었다).
+  - title: 의존성 주입 & 초기화
     parts:
-      # 1
-      - title: 의존성 주입 & 초기화
+      -
         lede: >-
           의존 순서를 `await`로 직렬화해 데이터 로드 전 플레이어 생성 같은 경쟁 조건을 원천 차단했습니다.
           순수 C# 클래스는 `Register`, 씬의 MonoBehaviour는 `RegisterComponent`로 구분 등록합니다.
@@ -240,8 +241,9 @@ features:
             body: >-
               이 프로젝트의 모든 `UniTask.Delay`는 `ignoreTimeScale` 기본값(false)입니다. 레벨업 · 게임오버로
               `Time.timeScale = 0`이 되면 스폰 간격 · 연사 딜레이 · 피격 무적 대기도 함께 멈춥니다. (의도된 동작)
-      # 2
-      - title: 데이터 파이프라인 — TSV 임포트 · DataManager
+  - title: 데이터 파이프라인 — TSV 임포트 · DataManager
+    parts:
+      -
         lede: >-
           스프레드시트에서 작업한 밸런싱 데이터(TSV)를 커스텀 에디터 툴로 `ScriptableObject`에 담고,
           런타임에는 조회가 빠른 딕셔너리로 재가공합니다.
@@ -306,8 +308,9 @@ features:
             body: >-
               스킬 TSV의 6번 인덱스(최소 레벨)는 코드에서 읽지 않고 건너뜁니다. `AssetDatabase.SaveAssets()`는
               주석 처리돼 있어, `SetDirty` 후 수동/자동 저장이 있어야 디스크에 반영됩니다.
-      # 3
-      - title: 이벤트 큐 전투 시스템
+  - title: 이벤트 큐 전투 시스템
+    parts:
+      -
         lede: >-
           개별 객체가 대상을 직접 때리지 않고, 모든 데미지를 `InGameEvent` 구조체로 큐에 넣어
           프레임당 한 곳에서 순차 처리합니다.
@@ -348,8 +351,9 @@ features:
             body: >-
               몬스터 등록 · 해제는 풀의 `createFunc`(RegisterMonster) · `actionOnDestroy`(RemoveMonster)에 걸립니다.
               `Max_Event_Count`(1000) 상수와 주입된 `_dataManager` · `EventCallback`은 현재 사용처 · 구독자가 없습니다.
-      # 4
-      - title: 플레이어 & 적 — IFighter
+  - title: 플레이어 & 적 — IFighter
+    parts:
+      -
         lede: 플레이어와 적이 같은 `IFighter`를 상속해 전투 로직이 양쪽을 동일하게 취급합니다.
         blocks:
           - type: points
@@ -390,8 +394,9 @@ features:
             body: >-
               `EnemyStat.attackType`(Ranged · Boss)이 데이터엔 있으나 EnemyController가 분기에 쓰지 않아
               현재 모든 적이 근접 행동만 합니다. `EnemyController.Heal()`은 빈 구현입니다.
-      # 5
-      - title: 스킬 시스템 — SkillBase 계층
+  - title: 스킬 시스템 — SkillBase 계층
+    parts:
+      -
         lede: >-
           `SkillBase` 추상 클래스로 공통 상태를 정의하고 `override`로 확장합니다.
           레벨업 후 최초 획득 시 Addressables로 프리팹을 동적 장착합니다.
@@ -459,8 +464,9 @@ features:
             body: >-
               Mage 스킬 4종(4005~4008: ReleaseMagic · FireBall · LightningChain · IceMagic)은 TSV엔 있으나
               `JobType.Mage` 진입 경로가 없어 미사용입니다.
-      # 6
-      - title: 스폰 & 오브젝트 풀
+  - title: 스폰 & 오브젝트 풀
+    parts:
+      -
         lede: 게임 시작 시 풀을 미리 채우고(프리웜), 웨이브마다 독립 비동기 루프로 적을 스폰합니다.
         blocks:
           - type: points
@@ -505,8 +511,9 @@ features:
               - [부메랑, BoomerangManager, "10", "10", "10", BoomerangContainer]
               - [나선 투사체, SpiralManager, "10", "20", "20", SpiralContainer]
               - [경험치 보석, ExpManager, "50", "300", "50", ExpContainer]
-      # 7
-      - title: 경험치 & 레벨업
+  - title: 경험치 & 레벨업
+    parts:
+      -
         lede: 적이 떨군 보석이 플레이어에게 빨려와 경험치가 되고, 누적치가 임계에 닿으면 레벨업합니다.
         blocks:
           - type: code
@@ -541,8 +548,9 @@ features:
             body: >-
               `ExpItem`은 SetTarget 전까지 제자리에 있다가, 지정되면 MoveTowards(속도 15)로 비행해 거리²<0.25면
               수집 콜백을 부릅니다. 보석 풀은 50/300, 50개 프리웜, 모두 런타임 생성 ExpContainer의 자식입니다.
-      # 8
-      - title: UI 시스템
+  - title: UI 시스템
+    parts:
+      -
         lede: 상태가 변할 때만 UI를 갱신하고, Addressables 핸들을 추적해 네이티브 메모리 누수를 막았습니다.
         blocks:
           - type: points
@@ -577,8 +585,9 @@ features:
             body: >-
               `UIManager.OnDestroy`는 ExpManager 이벤트는 해제하나 PlayerController의 OnHpChanged · OnDeath 구독은
               해제하지 않습니다. 최대 레벨 스킬도 후보에서 제외되지 않으나 선택 시 maxLevel 가드로 변화 없이 반환됩니다.
-      # 9
-      - title: GC 스파이크 제거 기법
+  - title: GC 스파이크 제거 기법
+    parts:
+      -
         lede: 수백 개 오브젝트가 동시에 존재하는 환경에서 프레임당 힙 할당을 없애려 코드 전반에 적용한 기법들입니다.
         blocks:
           - type: points
@@ -598,8 +607,9 @@ features:
                 body: InGameEvent를 struct로 설계
               - title: MaterialPropertyBlock
                 body: 피격 플래시 시 공유 material 인스턴싱 방지
-      # 10
-      - title: 빌드 자동화 — GitHub Actions CI
+  - title: 빌드 자동화 — GitHub Actions CI
+    parts:
+      -
         lede: main 병합 시 GitHub 서버가 자동으로 Android 빌드를 수행하도록 환경을 통일 · 자동화했습니다.
         blocks:
           - type: points
@@ -610,8 +620,9 @@ features:
                 body: 로컬 PC 점유 · 환경 편차로 인한 빌드 차이 제거
               - title: Secrets 암호화
                 body: 라이선스 · 계정을 하드코딩 대신 GitHub Secrets로
-      # 11
-      - title: GC 최적화 결과
+  - title: GC 최적화 결과
+    parts:
+      -
         lede: >-
           사용 툴: Unity Profiler · Profile Analyzer. 테스트 환경 — 몬스터 스폰딜레이 0.1초, 10 · 15초 구간에
           몬스터 바리에이션 추가, 플레이어 체력 1000 고정.
@@ -630,8 +641,9 @@ features:
                 before: "824"
                 after: "249"
                 delta: 70% 감소
-      # 12
-      - title: 트러블슈팅 — 픽셀아트 텍스처 압축
+  - title: 트러블슈팅 — 픽셀아트 텍스처 압축
+    parts:
+      -
         lede: >-
           에디터에서 선명하던 픽셀아트가 Android 빌드 후 색이 뭉개졌습니다. 압축 포맷이 인접 픽셀을 블록으로
           묶어, 색 차이가 큰 픽셀아트는 정보가 훼손됩니다.
