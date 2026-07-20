@@ -621,8 +621,14 @@ const projectDocs = defineCollection({
        * 숫자 없는 문제 제기는 주관적 감상이라 근거가 되지 못한다.
        */
       evidence: z.string().min(1),
-      /** 범위 — 이 문서가 다루지 않는 것까지 그어준다 */
-      scope: z.string().min(1),
+      /**
+       * 범위 — 이 문서가 다루지 않는 것까지 그어준다.
+       *
+       * 2026-07-20 사용자 결정으로 optional 로 완화했다(원래 필수 게이트). scope 가 what 과 겹쳐(둘 다 '다루는 것'을
+       * 나열) 중복이라, 네 문서 전부에서 scope 를 뺐다. 채우면 '범위' 박스가 뜨고, 비우면 렌더가 건너뛴다([slug].astro).
+       * ⚠ evidence·stack 등 나머지 개요 게이트는 그대로 필수.
+       */
+      scope: z.string().min(1).optional(),
       /**
        * 기술 스택. 세 디자인 모두 개요(섹션 01)에 둔다 — 무엇으로 만들었나를 먼저 보인다.
        * purpose(사용 목적)를 필수로 둬 기술 이름만 나열하는 것을 막는다.

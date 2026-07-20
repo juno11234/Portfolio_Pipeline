@@ -26,10 +26,6 @@ overview:
   evidence: >-
     최적화 전후 Unity Profiler·Profile Analyzer 실측 — **GC Alloc In Frame 196회 → 4회 (97%↓)**,
     **Materials 824개 → 249개 (70%↓)**, 메모리 **140MB** 절감.
-  scope: >-
-    의존성 주입과 초기화 순서, 데이터 드리븐 파이프라인(TSV→ScriptableObject→런타임 딕셔너리), 이벤트 큐 전투
-    시스템, 오브젝트 풀링·GC 최적화 기법, 스킬 시스템, 이벤트 기반 UI, 빌드 자동화를 다룹니다.
-    **아트·사운드·레벨 디자인은 이 문서의 범위가 아닙니다.**
   # 기술 스택 — ① A1 에서. 코드에서 뽑아 v1(7행)보다 완전한 13행.
   stack:
     title: 데이터 주도 · 무할당을 위한 도구 선택

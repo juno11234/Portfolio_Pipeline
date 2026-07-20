@@ -108,10 +108,12 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
       )}
       {d.overview.goals !== undefined && <GoalCards goals={d.overview.goals} />}
       <Tldr label="▶ 10초 요약 — 이 문서가 증명하는 것" body={d.overview.evidence} />
-      <div class="scopebox">
-        <p class="scope-label">범위</p>
-        <p class="scope-body" set:html={rich(d.overview.scope)} />
-      </div>
+      {d.overview.scope !== undefined && (
+        <div class="scopebox">
+          <p class="scope-label">범위</p>
+          <p class="scope-body" set:html={rich(d.overview.scope)} />
+        </div>
+      )}
       {d.links.length > 0 && (
         <ul class="links">
           {d.links.map((link) => (
