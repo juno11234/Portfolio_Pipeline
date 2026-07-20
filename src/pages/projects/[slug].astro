@@ -187,11 +187,20 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
         </>
       )}
       <PartTitle badge="깨달음" title="아쉬웠던 점 · 깨달은 점" margin="40px 0 6px" />
-      {/* cells 를 채운 깨달음은 디자인 원형인 전폭 세로 LessonCard. 아니면 본문 길이로 격자↔세로. */}
-      {d.retrospective.learnings.every((l) => l.cells !== undefined) ? (
-        d.retrospective.learnings.map((l) => (
-          <LessonCard title={l.title} kind={l.tint === true ? 'tint' : 'plain'} cells={l.cells ?? []} margin="14px 0" />
-        ))
+      {/*
+        cells 를 채운 깨달음은 디자인 원형인 전폭 세로 LessonCard.
+        cells·body 가 섞이면 카드별로 나눈다 — cells 는 LessonCard, body 는 전폭 StackCard(둘 다 전폭이라 결이 맞는다).
+        예전엔 every(cells) 라 하나라도 body 면 cells 가 통째로 버려졌다(빈 카드). 이제 some 으로 열어 섞어 쓴다.
+        cells 가 하나도 없으면 본문 길이로 격자↔세로.
+      */}
+      {d.retrospective.learnings.some((l) => l.cells !== undefined) ? (
+        d.retrospective.learnings.map((l) =>
+          l.cells !== undefined ? (
+            <LessonCard title={l.title} kind={l.tint === true ? 'tint' : 'plain'} cells={l.cells} margin="14px 0" />
+          ) : (
+            <StackCards margin="14px 0" cards={[{ title: l.title, body: l.body ?? '' }]} />
+          ),
+        )
       ) : cardsAreLong(d.retrospective.learnings) ? (
         <StackCards margin="16px 0 4px" cards={d.retrospective.learnings.map((l) => ({ title: l.title, body: l.body ?? '' }))} />
       ) : (
