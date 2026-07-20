@@ -1,0 +1,683 @@
+# StarWars_Motive_Project (3d-Starwars) 기술 문서 — 코드 유래 신 파이프라인 산출물.
+#
+# 입력 3양식(src/assets/starwars/): 1-구현.md(①) · 2-판단-직접.md(②) · 3-자산.md(③).
+#   ①=코드에서 뽑은 사실 · ②=사람의 판단·회고 · ③=스크린샷·링크·확인 메타.
+# 슬러그는 projects.yaml 키 `starwars-jedi`(자산 폴더명은 starwars — hammer/Corporate 처럼 다르다).
+# 그래프(FSM·흐름·타입계층)는 mermaid. 스크린샷 3장은 raw 파일명(화면 캡처…)을 kebab 으로 리네임.
+#
+# ⚠ 코드의 실제 식별자에 오타가 있다 — CombatSysytem · EvenetType · Reciever · ExcutionReady.
+#    실제 클래스/필드명이라 지어내지 않고 그대로 쓴다(코드 참조가 어긋나지 않게).
+#
+# 5단 매핑: overview / architecture(6계층·계약) / features[파쿠르·전투·가드·AI·연출] / decisions 5건 / retrospective
+subtitle: 3인칭 액션 — 벡터 수학 파쿠르와 타임라인 연출
+overview:
+  lead: >-
+    벡터 연산(외적·내적·투영)으로 **벽 달리기·슬라이딩·활공**을 구현한 파쿠르 이동, `IFighter` 인터페이스와
+    **이벤트 큐**로 송수신을 추상화한 전투 시스템, 그리고 **Timeline·Cinemachine·옵저버 QTE**로 엮은 연출을
+    축으로 한 1인 개발 3인칭 액션 게임입니다.
+  what: >-
+    이 문서는 **플레이어/적/보스의 상태 머신, 전투 이벤트 파이프라인, 파쿠르 이동의 수학, QTE·타임라인 연출**이
+    코드에서 어떻게 구성됐는지를 다룹니다 — 코드 지도입니다.
+  why: >-
+    게임을 하며 "해보고 싶던" 이동 액션 — 벽 달리기·슬라이딩·활공·워프 — 을 직접 구현하고,
+    **벡터 연산(외적·내적·투영)을 실제 조작감으로 옮기는 것**이 목표였습니다. 컷씬은 코드 타이밍 대신
+    **Timeline 으로 프레임 단위 연출**을 다뤄보고 싶었습니다.
+  evidence: >-
+    성능 문제를 고치려 시작한 게 아니라 **기능·연출 학습**이 목표라, 착수를 촉발한 단일 수치는 없습니다.
+    대신 개발 중 관측된 **스파이크 3종을 프로파일러로 진단**해 진짜 병목과 아티팩트를 갈랐습니다 —
+    에디터 랙 `66ms / 15FPS`(원인 `EditorLoop`, 빌드엔 없음), 씬 로드 `GC.Collect ~191ms`,
+    `Gfx.WaitForPresent ~14.55ms`(GPU 병목이 아니라 VSync 대기). **빌드까지 대조**해야 병목이 보였습니다.
+  stack:
+    title: 벡터 수학 · 이벤트 큐 · 타임라인 연출을 위한 도구 선택
+    rows:
+      - category: 엔진 · 렌더
+        tech: Unity 2022.3.62f1 · URP 14.0.12
+        purpose: 3D 액션 클라이언트 · URP 로 Sci-Fi 파티클/발광 이펙트 렌더
+      - category: 언어
+        tech: C#
+        purpose: 상태 머신·전투·이동 등 게임플레이 로직 전반
+      - category: 입력
+        tech: Unity Input System
+        purpose: 이동/전투는 PlayerInput 액션맵, QTE 는 별도 QTE 액션맵으로 분리 감지
+      - category: 이동 · AI
+        tech: NavMesh (NavMeshAgent)
+        purpose: 일반 적 순찰·추격, 중간보스 추격 경로 탐색
+      - category: 연출
+        tech: Unity Timeline (PlayableDirector)
+        purpose: 컷씬 재생 · QTE 성공/실패에 따른 타임라인 분기
+      - category: 카메라
+        tech: Cinemachine (ImpulseSource)
+        purpose: 피격·보스 등장·벽 충돌 시 임펄스 카메라 흔들림
+      - category: 데이터
+        tech: ScriptableObject (SFXData)
+        purpose: 사운드 클립·볼륨·피치를 에셋으로 분리한 데이터 주도화
+      - category: 애니메이션
+        tech: Animator StateMachineBehaviour
+        purpose: 공격 애니 normalizedTime 구간에 히트박스 On/Off — 애니와 판정 동기화
+screenshot:
+  src: ../../assets/starwars/starwars-gameplay.png
+  caption: 3인칭 액션 플레이 — 협곡에서 검을 든 플레이어가 거대 보스와 교전, URP 파티클 폭발·발광 이펙트가 터진다
+meta:
+  team: 1인
+  # git log 첫 커밋 2025-06-07, 코드 커밋이 2025-06 에 68건 집중. README 명시 개발 기간 2025.06.09~06.27.
+  period: 2025.06.07 ~ 06.27
+  vcs: Github Desktop
+  engine: Unity 2022.3.62f1 · URP
+  # ③은 "Rider"만, README 는 2025.1.4 명시 — 코드 저장소 표기를 따른다.
+  ide: Rider 2025.1.4
+links:
+  # ③에서 확인. 깃허브 .git 접미사는 canonical 로 정리.
+  - label: 플레이 영상 (YouTube)
+    url: https://youtu.be/pTWrzWdO8Wg
+  - label: GitHub 저장소
+    url: https://github.com/juno11234/3d-Starwars
+architecture:
+  title: 시스템 구조
+  intro: >-
+    입력 → 상태 머신 → 애니메이션 → 히트박스 → **이벤트 큐** → 데미지 처리로 이어지는 단방향 흐름이 골격입니다.
+    전투 참여자는 모두 `IFighter` 로 추상화되고, 실제 피해 전달은 `CombatSysytem` 싱글턴의 큐가 프레임 단위로 중계합니다.
+  parts:
+    - badge: 구성요소
+      title: 6계층 아키텍처 — 입력에서 연출까지
+      blocks:
+        - type: layers
+          components: >-
+            Input System 액션맵, 두 방식의 상태 머신(**클래스 State 패턴**=Player·Boss / **enum switch**=일반 적),
+            `CombatSysytem` 이벤트 큐, `IFighter` 계약, Timeline·Cinemachine, `SoundManager` 오브젝트 풀로 이루어집니다.
+          relations: >-
+            감지 콜라이더(`Blade`/`Bullet`/`Middle_DashAttackColl`)와 `AttackSender` 는 `CombatSysytem` 에 이벤트를
+            **등록만** 하고, `CombatSysytem` 이 `IFighter.TakeDamage` 를 **호출**합니다(송신자는 수신자를 모릅니다).
+            상태 클래스는 자신의 StateMachine 을 통해서만 전이하고, 넉백은 `KnockbackClass.KnockbackFunc`(static)로 결합을 끊었습니다.
+          flow: >-
+            입력 → 상태 전환 → 애니 재생 → `AttackSender` 가 `normalizedTime` 구간에 히트박스 On → 콜라이더 충돌 →
+            `CombatEvent` 큐 등록 → `CombatSysytem.Update` 가 최대 10개 처리 → `TakeDamage`(hp 차감·사망·그로기) →
+            (보스) 그로기/사망 시 QTE·타임라인 연출.
+          layers:
+            - name: 입력 계층 · INPUT
+              note: 액션맵 → 상태 머신 입력 프로퍼티
+              items:
+                - name: InputManager
+                - name: PlayerInput · QTE 액션맵
+            - name: 상태 계층 · STATE
+              note: State 패턴(Player·Boss) · enum switch(적)
+              items:
+                - name: PlayerStateMachine
+                  emphasis: true
+                - name: Middle_BossStateMachine
+                - name: Enemy · enum 4상태
+            - name: 감지 계층 · SENSE
+              note: 충돌·애니 타이밍 → CombatEvent 생성
+              items:
+                - name: Blade · Bullet · Middle_DashAttackColl
+                - name: PlayerAttackSender · BossAttackSender
+            - name: 전투 계층 · COMBAT
+              note: 이벤트 큐 · 프레임당 10개
+              items:
+                - name: CombatSysytem
+                  emphasis: true
+                - name: IFighter 계약
+                - name: InGameEvent · CombatEvent
+                  kind: dashed
+            - name: 연출 계층 · PRESENTATION
+              note: 타임라인 · QTE · 카메라 임펄스
+              items:
+                - name: CutsceneManager · QTEManager
+                - name: QTETimelineBranch
+                - name: CameraShakeTrigger · Portal
+            - name: 지원 계층 · SUPPORT
+              note: DontDestroyOnLoad 싱글턴
+              items:
+                - name: SoundManager · AudioSource 풀
+    - badge: 관계
+      title: 핵심 인터페이스 계약 · Class Diagram
+      lede: >-
+        전투 참여자는 `IFighter`, 상태는 `IPlayerState`/`IBossState` 계약에 의존합니다. `CombatSysytem` 은
+        `Dictionary` 로 콜라이더에서 `IFighter` 를 역참조하므로, 송신자는 수신자의 구체 타입을 모릅니다.
+      blocks:
+        - type: mermaid
+          question: 전투·상태·이벤트 세 축은 각각 무슨 계약에 의존하고 누가 구현하나?
+          source: |
+            classDiagram
+                class IFighter {
+                    <<interface>>
+                    +Collider MainCollider
+                    +Attack()
+                    +TakeDamage(CombatEvent)
+                }
+                class Player
+                class Enemy
+                class Middle_BossStateMachine
+                IFighter <|.. Player
+                IFighter <|.. Enemy
+                IFighter <|.. Middle_BossStateMachine
+
+                class IPlayerState {
+                    <<interface>>
+                    +Enter()
+                    +Input()
+                    +UpdateLogic()
+                    +Exit()
+                }
+                class IBossState {
+                    <<interface>>
+                    +Enter()
+                    +UpdateLogic()
+                    +Exit()
+                }
+                class PlayerStateMachine
+                PlayerStateMachine o-- IPlayerState : currentState 11종
+                Middle_BossStateMachine o-- IBossState : currentState 6종
+
+                class InGameEvent {
+                    <<abstract>>
+                    +EvenetType Type
+                    +IFighter Reciever
+                }
+                class CombatEvent {
+                    +int Damage
+                }
+                InGameEvent <|-- CombatEvent
+    - badge: 결합 끊기
+      title: 송신자는 수신자를 모른다
+      blocks:
+        - type: points
+          variant: numbered
+          columns: 3
+          items:
+            - tag: '01'
+              title: 등록만 · 호출은 시스템이
+              body: 감지 콜라이더·AttackSender 는 `CombatEvent` 를 큐에 **등록만**, `CombatSysytem` 이 `TakeDamage` 를 호출
+            - tag: '02'
+              title: 계약으로 역참조
+              body: '`Dictionary<Collider, IFighter>` 로 충돌 콜라이더에서 대상을 찾아 구체 타입 없이 피해 전달'
+            - tag: '03'
+              title: static 으로 넉백 분리
+              body: 넉백은 `KnockbackClass.KnockbackFunc`(static Action)로 호출해 서로 참조 없이 결합을 끊음
+features:
+  - title: 벡터 수학 파쿠르 이동
+    intro: >-
+      이동/전투를 `IPlayerState` 11종으로 나눠 각각 클래스로 구현하고, `PlayerStateMachine.Update` 는 중력·`Move` 만
+      공통 처리하고 나머지는 현재 상태에 위임합니다. 벽 달리기·슬라이딩·활공은 **벡터 연산**으로 방향을 만듭니다.
+    parts:
+      - badge: FSM
+        title: 플레이어 상태 머신 — Move 허브
+        lede: >-
+          `Move` 를 허브로 이동·전투 상태가 전이합니다. 각 상태는 자기 `Enter`/`Exit` 안에서 진입·복귀를 관리합니다.
+        blocks:
+          - type: mermaid
+            question: 어떤 입력·조건이 어떤 이동 상태로 전이시키나?
+            source: |
+              stateDiagram-v2
+                  direction LR
+                  [*] --> Move
+                  Move --> Attack: AttackInput · 3타 콤보
+                  Move --> Guard: GuardInput & 스태미나>0
+                  Move --> Jump: JumpInput
+                  Move --> Sliding: SlidingTrigger
+                  Move --> Flying: FlyingTrigger
+                  Jump --> WallRun: 벽 감지 & RunInput
+                  Jump --> Move: 착지
+                  WallRun --> WallJump: JumpInput · 벽 이탈
+                  WallJump --> Jump: TryJump
+                  WallJump --> WallRun: 벽 감지 & 쿨
+                  WallJump --> Move: 착지
+                  Sliding --> Jump: 트리거 해제
+                  Flying --> Jump: 웨이포인트 끝
+                  Attack --> Move
+                  Guard --> Move: 해제 · 스태미나 소진
+                  Knockback --> Move: 2초 경과
+      - badge: 벡터 수학
+        title: 벽 달리기(외적·내적) · 슬라이딩(투영)
+        lede: >-
+          벽 법선과 업벡터를 **외적**해 진행 축을, 그 축과 모델 전방을 **내적**해 부호를 정합니다.
+          슬라이딩은 다운벡터를 바닥 법선에 **투영**해 경사 방향만 남깁니다.
+        blocks:
+          - type: code
+            api: WallRunPlayerState.UpdateLogic() · 외적으로 진행 방향, 내적으로 부호
+            code: |-
+              // 외적: 벽 법선 × 업벡터 → 항상 업벡터에 수직인(=수평) 진행 축
+              Vector3 moveDir = Vector3.Cross(wallNormal, Vector3.up).normalized;
+              // 방향 조절: 벽을 따라가는 두 방향 중 플레이어가 보던 쪽
+              if (Vector3.Dot(moveDir, player.Model.forward) < 0) moveDir = -moveDir;
+
+              player.Model.rotation = Quaternion.LookRotation(moveDir, wallNormal);
+              player.Controller.Move(moveDir * (wallRunSpeed * Time.deltaTime));
+            notes:
+              - at: Cross(wallNormal, up)
+                why: 벽이 기울어 법선의 Y가 0이 아니어도 항상 업벡터에 수직인 벡터를 주므로 대각선으로 새지 않는다.
+              - at: Dot(..) < 0
+                why: 벽을 따라가는 두 방향 중 플레이어가 보던 쪽을 골라 진행 부호를 정한다.
+          - type: code
+            api: SlidingPlayerState.UpdateLogic() · 바닥 법선에 다운벡터 투영
+            code: |-
+              Vector3 downDir = Vector3.ProjectOnPlane(Vector3.down, slopeNormal).normalized;
+              Vector3 move = downDir * (player.slidingSpeed * Time.deltaTime);
+              player.Controller.Move(move);
+            notes:
+              - at: ProjectOnPlane(down, slopeNormal)
+                why: 다운벡터를 경사면(법선)에 투영하면 경사 방향 성분만 남아 바닥을 파고들지 않고 표면을 타고 내려간다.
+      - badge: 스탯
+        title: 이동 스탯
+        blocks:
+          - type: table
+            headers: [스탯, 값]
+            rows:
+              - ['걷기 속도 walkSpeed', '5']
+              - ['달리기 속도 runSpeed', '9']
+              - ['점프 높이 jumpHeight', '3']
+              - ['중력 gravity', '-9.81']
+              - ['최대 점프 횟수 maxJumpCount', '2']
+              - ['슬라이딩 속도 slidingSpeed', '50']
+              - ['벽 점프 수평 속도 wallJumpHorizontalSpeed', '100']
+              - ['활공 속도 flySpeed', '20']
+  - title: 이벤트 큐 기반 전투 시스템
+    intro: >-
+      모든 피해는 `CombatEvent` 로 만들어 `CombatSysytem` 싱글턴 큐에 넣고, 시스템이 프레임 단위로 꺼내
+      `IFighter.TakeDamage` 를 호출합니다. 히트박스는 애니메이션 클립 진행도가 소유합니다.
+    parts:
+      - badge: 흐름
+        title: 한 번의 타격이 데미지가 되기까지
+        blocks:
+          - type: mermaid
+            question: 한 번의 타격이 데미지가 되기까지 무엇을 거치나?
+            source: |
+              flowchart TD
+                  I["공격 입력 · AttackPlayerState"] --> S["AttackSender · normalizedTime 구간에 히트박스 On"]
+                  S --> C["Blade.OnTriggerEnter · Enemy 태그"]
+                  C --> E["CombatEvent 생성 · AddInGameEvent"]
+                  E --> Q["CombatSysytem 큐 · _eventQueue"]
+                  Q -->|"Update · 프레임당 ≤ 10개"| D["Dequeue · switch(Type)"]
+                  D --> T["IFighter.TakeDamage · hp 차감/사망"]
+      - badge: 핵심 코드
+        title: 큐 처리 상한 · 애니 동기 히트박스
+        blocks:
+          - type: code
+            api: CombatSysytem.Update() · 프레임당 최대 10개
+            code: |-
+              int processCount = 0;
+              while (inGameEventQueue.Count > 0 && processCount < Max_Event_COUNT)
+              {
+                  var inGameEvent = inGameEventQueue.Dequeue();
+                  switch (inGameEvent.Type)
+                  {
+                      case InGameEvent.EvenetType.Combat:
+                          var combatEvent = inGameEvent as CombatEvent;
+                          inGameEvent.Reciever.TakeDamage(combatEvent);
+                          break;
+                  }
+                  processCount++;
+              }
+            notes:
+              - at: processCount < Max_Event_COUNT
+                why: 한 프레임 처리량을 10개로 제한한다. 남은 이벤트는 다음 프레임으로 이월돼 순간 부하를 평탄화한다.
+              - at: switch (Type) · as 캐스트
+                why: InGameEvent 를 CombatEvent 로 다운캐스트해 수신자(Reciever)의 TakeDamage 로 넘긴다. 현재 Combat 타입만 쓰되 확장 여지를 둔 구조다.
+          - type: code
+            api: PlayerAttackSender.OnStateUpdate() · 애니 진행도로 히트박스 개폐
+            code: |-
+              if (passStartNormalizedTime == false && startNormalizedTime < stateInfo.normalizedTime)
+              {
+                  Player.CurrentPlayer.AttackCollOn();
+                  passStartNormalizedTime = true;
+              }
+              if (passEndNormalizedTime == false && endNormalizedTime < stateInfo.normalizedTime)
+              {
+                  Player.CurrentPlayer.AttackCollOff();
+                  passEndNormalizedTime = true;
+              }
+            notes:
+              - at: startNormalizedTime~endNormalizedTime
+                why: 공격 애니의 지정 구간에만 검(Blade) 콜라이더를 켜 판정이 모션과 정확히 맞물린다. 타이밍은 코드가 아니라 애니 클립이 소유한다.
+              - at: pass* 플래그
+                why: 각 시점을 프레임당 1회만 발동시켜 히트박스 개폐를 중복 없이 처리한다.
+      - badge: 수치
+        title: 전투 수치
+        blocks:
+          - type: table
+            headers: [값, 수치, 출처]
+            rows:
+              - ['프레임당 이벤트 처리 상한 Max_Event_COUNT', '10', 'CombatSysytem']
+              - ['플레이어 검 데미지 Blade.damage', '35', 'Blade']
+              - ['일반 적 총알 데미지 Bullet.damage', '10', 'Bullet']
+              - ['보스 돌진 데미지 Middle_DashAttackColl.damage', '20', 'Middle_DashAttackColl']
+  - title: 가드 · 패링 시스템
+    intro: >-
+      Guard 상태는 진입 직후 **0.3초** 패링 윈도우를 열고, 이후엔 피해를 hp 대신 **가드 스태미나**에서 깎습니다.
+      같은 `CombatEvent` 라도 플레이어 상태에 따라 무효/스태미나/체력으로 갈라집니다.
+    parts:
+      - badge: 분기
+        title: 패링 → 가드 → 피격 우선순위
+        lede: >-
+          패링 중 근접은 무효·총알은 반사, 가드 중이면 스태미나 차감(0 → GuardBreak), 그 외엔 hp 차감입니다.
+        blocks:
+          - type: code
+            api: Player.TakeDamage() · 상태별 피해 분기
+            code: |-
+              if (IsParrying)
+              {
+                  parryingParticle.Play(true);
+                  return;
+              }
+              if (IsGuarding)
+              {
+                  stats.guardStamina -= combatEvent.Damage;
+                  if (stats.guardStamina <= 0) GuardBreak();
+                  return;
+              }
+              stats.hp -= combatEvent.Damage;
+              if (stats.hp <= 0) Die();
+            notes:
+              - at: IsParrying → IsGuarding → hp 순
+                why: 패링 → 가드 → 일반 피격 순으로 우선순위를 두어, 같은 CombatEvent 라도 상태에 따라 무효·스태미나·체력으로 갈라 처리한다.
+              - at: 총알 반사(별도)
+                why: 패링 중 Bullet 은 데미지 대신 진행 방향을 반전(parryBullet)해 되돌리고, 반사된 총알이 적에 맞으면 이번엔 적이 CombatEvent 를 받는다.
+          - type: table
+            headers: [피격 시 상태, 처리, 관련 수치]
+            rows:
+              - ['패링(진입 0.3초 내)', '근접 무효 · 총알 반사', 'parryTime 0.3s']
+              - ['가드 중', '스태미나 차감, 0 → GuardBreak', 'guardStamina 50']
+              - ['그 외', 'hp 차감, 0 → 사망', 'hp 100']
+              - ['스태미나 회복', '가드 쿨 후 1초당 +1', 'guardCool 2s']
+  - title: 이원화된 적 · 보스 AI
+    intro: >-
+      일반 적은 **enum switch FSM**(4상태), 중간보스는 **`IBossState` 클래스 State 패턴**(6상태)으로 나눴습니다 —
+      규모에 맞춰 전이 방식을 다르게 골랐습니다. 최종보스는 자체 상태 머신 없이 타임라인·시그널로 구동됩니다.
+    parts:
+      - badge: 일반 적
+        title: enum switch FSM · 내적 시야 판정
+        lede: >-
+          `Enemy` 는 Patrol·Chase·Attack·Die 4상태를 enum switch 로 돌리고, 시야는 각도(내적)+거리로 판정한 뒤
+          레이캐스트로 차폐를 확인합니다.
+        blocks:
+          - type: mermaid
+            question: 적이 언제 순찰/추격/공격/사망으로 바뀌나?
+            source: |
+              stateDiagram-v2
+                  [*] --> Patrol
+                  Patrol --> Chase: 시야 확보 · 피격
+                  Chase --> Attack: 사거리 & 시야
+                  Chase --> Patrol: 이탈
+                  Attack --> Chase: 발사 애니 종료
+                  Patrol --> Die: hp ≤ 0
+                  Chase --> Die: hp ≤ 0
+                  Attack --> Die: hp ≤ 0
+                  Die --> [*]
+          - type: code
+            api: Enemy.WatchPlayer() · 내적으로 각도, 캐싱한 코사인 비교
+            code: |-
+              float dotProduct = Vector3.Dot(transform.forward, direction);
+              float halfViewAngleCosine = _halfViewAngleCosine; // Awake 에서 Cos(viewAngle*0.5) 캐싱
+              if (dotProduct < halfViewAngleCosine || distance > stats.viewDistance) return false;
+              Physics.Raycast(transform.position + Vector3.up, direction, out RaycastHit hit, stats.viewDistance);
+            notes:
+              - at: Dot vs 캐싱한 코사인
+                why: 각도 비교를 Vector3.Angle 대신 내적 vs 미리 구한 코사인으로 처리 — 매 프레임 역삼각함수를 피한다.
+              - at: 통과 후 Raycast
+                why: 각도·거리를 통과한 경우에만 레이캐스트로 벽 뒤 은폐를 확인한다.
+      - badge: 중간보스
+        title: State 패턴 6상태 · 스킬 랜덤 · 벽 충돌 그로기
+        lede: >-
+          스킬 쿨(15초)이 차면 돌진/충격파를 **랜덤 선택**하고, **돌진이 벽에 부딪히면 그로기(3초)** 에 빠져
+          처형 기회를 줍니다.
+        blocks:
+          - type: mermaid
+            question: 보스가 언제 스킬/공격/그로기/처형으로 가나?
+            source: |
+              stateDiagram-v2
+                  [*] --> Chasing
+                  Chasing --> NormalAttack: 거리 < 6.5
+                  Chasing --> DashAttack: 쿨 15s · 랜덤
+                  Chasing --> PulseAttack: 쿨 15s · 랜덤
+                  DashAttack --> Groggy: 벽 충돌 CrashWall
+                  NormalAttack --> Chasing
+                  PulseAttack --> Chasing
+                  Groggy --> Chasing: 3초
+                  Chasing --> ExcutionReady: OnDie
+                  ExcutionReady --> [*]
+          - type: code
+            api: Middle_BossStateMachine.UseSkill() · 스킬 랜덤 선택
+            code: |-
+              int random = Random.Range(0, 2);
+              if (random == 0) { skillState = new Middle_DashAttackState(this);  skillStateType = MiddleBossStateType.DashAttack; }
+              else             { skillState = new Middle_PulseAttackState(this); skillStateType = MiddleBossStateType.PulseAttack; }
+            notes:
+              - at: Random.Range(0, 2)
+                why: 쿨(skillCool 15s)이 찰 때마다 돌진/충격파 두 스킬 중 하나를 뽑아 패턴을 예측 불가능하게 만든다.
+          - type: figure-grid
+            cells:
+              - src: ../../assets/starwars/starwars-boss-pulse.png
+                caption: '**충격파**(PulseAttack) — 장판형 충격파로 주변을 타격'
+                background: '#232323'
+              - src: ../../assets/starwars/starwars-boss-dash.png
+                caption: '**돌진**(DashAttack) — 붉은 예고 범위 후 직선 돌진, 벽에 부딪히면 그로기'
+                background: '#232323'
+      - badge: 스탯 · 최종보스
+        title: AI 스탯과 연출형 최종보스
+        blocks:
+          - type: table
+            headers: [대상, 값, 수치]
+            rows:
+              - ['일반 적', 'hp / 시야각 / 시야거리 / 추적범위', '100 / 120° / 10 / 30']
+              - ['중간보스', 'hp / 스킬 쿨 / 근접 전환 거리 / 그로기', '300 / 15s / 6.5 / 3s']
+          - type: callout
+            badge: 최종보스
+            tone: white
+            body: >-
+              최종보스(`FinalBossAnimatorController`)는 **자체 상태 머신 없이** Animator 트리거 래퍼
+              (Hide/Appear/Scream/Attack…)만 노출합니다 — **타임라인·시그널로 구동되는 연출형 보스**입니다.
+  - title: 옵저버 QTE · 타임라인 · 카메라 연출
+    intro: >-
+      `QTEManager` 가 입력을 **해시로 비교**해 성공/실패를 `Action` 이벤트로 발행하고, 구독자는 QTE 내부를 모른 채
+      타임라인·연출을 전환합니다. 카메라는 Cinemachine 임펄스로 흔들립니다.
+    parts:
+      - badge: QTE
+        title: 옵저버 패턴 QTE — 입력이 어떤 연출로 갈라지나
+        blocks:
+          - type: mermaid
+            question: QTE 입력이 어떤 연출로 갈라지나?
+            source: |
+              flowchart TD
+                  T["QTETrigger · 진입"] --> S["QTEManager.StartQTE · QTE 액션맵 Enable · UI 생성"]
+                  S --> H["입력마다 해시 비교"]
+                  H -->|"순서 완주"| OK["OnQTESuccess"]
+                  H -->|"오입력 · 시간초과"| NG["OnQTEFailed"]
+                  NG --> B["QTETimelineBranch · 현재 타임라인 Stop · 실패 타임라인 Play"]
+          - type: code
+            api: QTEManager.OnActionPerformed() · 입력 vs 정답 해시 비교
+            code: |-
+              var actionNameHash = Animator.StringToHash(context.action.name);
+              if (actionNameHash == qteKeyHash[currentIndex])
+              {
+                  MarkKeySuccess(currentIndex);
+                  currentIndex++;
+                  if (currentIndex >= qteKey.Count) EndQTE(true);
+              }
+              else { MarkKeyFail(currentIndex); EndQTE(false); }
+            notes:
+              - at: StringToHash 로 비교
+                why: 문자열 대신 int 해시로 비교해 입력마다 드는 비교 비용을 낮춘다. 정답 시퀀스는 시작 시 한 번 해시로 캐싱한다.
+              - at: currentIndex 진행
+                why: 인덱스가 시퀀스 끝에 닿으면 성공 종료, 하나라도 틀리면 즉시 실패 종료.
+      - badge: 연출
+        title: 이벤트 구독으로 타임라인 · 카메라 분리
+        lede: >-
+          QTE 는 결과만 이벤트로 던지고, 연출 전환은 구독자가 책임집니다 — QTE 로직과 연출이 분리된 느슨한 결합입니다.
+        blocks:
+          - type: code
+            api: QTETimelineBranch · 실패 이벤트 구독 → 타임라인 분기
+            code: |-
+              private void Start() { qteManager.OnQTEFailed += QTEFail; }
+              public void QTEFail() { currentTimeline.Stop(); failTimeline.Play(); }
+            notes:
+              - at: OnQTEFailed 구독
+                why: QTE 는 결과만 발행하고 연출 전환은 구독자가 책임진다 — QTE 로직과 연출이 분리된다.
+          - type: callout
+            badge: 카메라
+            tone: tint
+            body: >-
+              `CutsceneManager` 가 컷씬 프리팹을 `Instantiate` 하고 `PlayableDirector.Play` 하며, `BossCameraShakeTrigger`/
+              `FlyCameraShakeTrigger` 가 Cinemachine `ImpulseSource` 로 피격·보스 등장·벽 충돌 시 화면을 흔듭니다.
+              `Portal` 진입은 카메라를 흔들고 `waypoints` 를 넘겨 플레이어를 Flying(웨이포인트 추종 비행) 상태로 진입시킵니다.
+decisions:
+  - title: 적 시야 판정 — 정확한 계산 vs 대소 비교 최적화
+    options:
+      - { key: A, title: Vector3.Distance + Vector3.Angle }
+      - { key: B, title: sqrMagnitude + Vector3.Dot, chosen: true }
+    criteria:
+      - label: 얻는 정보
+        values:
+          - 실제 거리·각도(정확)
+          - 대소 관계만(비교엔 충분)
+      - label: 연산 비용
+        values:
+          - 제곱근 + acos(역삼각)
+          - 곱셈·덧셈 · 코사인은 Awake 1회 캐싱
+      - label: 코드 가독성
+        values:
+          - 높음(의미가 그대로 드러남)
+          - 낮음(제곱·내적 의도를 알아야 함)
+      - label: 호출 빈도
+        values:
+          - 매 프레임 Update(상시 감지)
+          - 동일
+    reason: >-
+      시야 판정은 "범위 안/밖"이라는 **대소 비교만** 필요하지 정확한 거리·각도 값 자체는 쓰지 않습니다. 그런데 이 판정은
+      `Update` 에서 **매 프레임 상시** 돕니다. 값이 필요 없는 곳에서 매 프레임 sqrt·acos 를 태우는 건 낭비라, 가독성을
+      조금 포기하더라도 ==곱셈·덧셈만으로 끝나는 B== 를 택했습니다. 시야각 코사인은 상수라 `Awake` 에서 한 번만 캐싱했습니다.
+  - title: 벽 달리기 진행 방향 — 투영 vs 외적
+    options:
+      - { key: A, title: 투영 (ProjectOnPlane) }
+      - { key: B, title: 외적 (Cross), chosen: true }
+    criteria:
+      - label: 평지 벽
+        values:
+          - 정상
+          - 정상
+      - label: 기울어진 벽
+        values:
+          - '!!경사 따라 방향 틀어짐(대각선 이탈)!!'
+          - 항상 수평 유지
+      - label: 조작감
+        values:
+          - 벽 각도에 따라 흔들림
+          - 기울어져도 일관된 수평 이동
+    reason: >-
+      처음엔 직관적으로 투영으로 짰는데, **기울어진 벽에서 캐릭터가 경사를 따라 위/아래로 새는 문제**가 나왔습니다.
+      원인은 투영이 "벽 평면 위 방향"을 주다 보니 벽 기울기가 진행 방향에 섞여 든 것. ==외적 `Cross(법선, 업벡터)` 는
+      두 벡터에 동시에 수직인 축을 주므로, 벽이 얼마나 기울든 항상 수평인 진행 축이 나옵니다.== 벽 타는 조작감은
+      기울어져도 수평이 유지돼야 안정적이라 외적으로 바꿨습니다. (투영이 나쁜 게 아니라 슬라이딩엔 투영이 맞습니다 — 회고 참조.)
+  - title: 보스 AI 구현 — 단일 클래스 vs 상태 패턴
+    options:
+      - { key: A, title: 단일 클래스 (enum + switch) }
+      - { key: B, title: 상태 패턴 (IBossState), chosen: true }
+    criteria:
+      - label: 상태 수(6+)
+        values:
+          - 한 switch 에 비대
+          - 상태별 클래스로 분산
+      - label: 신규 공격 패턴 추가
+        values:
+          - 기존 switch 수정
+          - 클래스만 추가(기존 불변)
+      - label: 상태별 책임
+        values:
+          - 한 클래스에 혼재
+          - 상태마다 분리
+      - label: 초기 작성량
+        values:
+          - 적음
+          - 많음(인터페이스·클래스)
+    reason: >-
+      보스는 6상태 + 스킬 랜덤 분기(돌진/충격파) + 그로기/처형으로 상태가 많고, **처음부터 공격 패턴 확장을 염두**에 뒀습니다.
+      단일 클래스 enum-switch 면 스킬을 추가할 때마다 거대한 switch 를 계속 수정해야 합니다. ==상태 패턴은 클래스만 추가하면
+      기존 코드 수정 없이 확장되고, 상태마다 책임이 분리돼 유지보수가 쉽습니다.== 복잡도·확장성이 큰 보스라 상태 패턴의 이득이
+      초기 작성량을 넘어선다고 봤습니다.
+  - title: 잡몹 AI 구현 — if-else vs enum-switch
+    options:
+      - { key: A, title: if-else }
+      - { key: B, title: enum + switch, chosen: true }
+    criteria:
+      - label: 초기 구현 속도
+        values:
+          - 빠름
+          - 보통
+      - label: 상태 가시성
+        values:
+          - 조건에 흩어짐
+          - enum 으로 명시
+      - label: 가독성(4상태)
+        values:
+          - 무난
+          - 더 명확
+      - label: 상태 추가
+        values:
+          - 조건 중첩
+          - case 추가
+    reason: >-
+      잡몹은 순찰 → 발견 시 공격 → 이탈 시 추격의 단순 4상태 루프라, 클래스를 나누는 상태 패턴까진 과하고
+      **한 클래스 안에서 전이 방식만** 정하면 됐습니다. 처음엔 **if-else 로 빠르게 짜 동작을 검증**하고, 규칙이 굳은 뒤
+      ==상태 구분이 명확한 enum-switch 로 리팩터링== 해 가독성을 확보했습니다. "동작 검증 → 구조 정리" 순서로 재작업을 줄였습니다.
+  - title: QTE 키 입력 비교 — 문자열 vs int 해시
+    options:
+      - { key: A, title: 액션 이름 string 직접 비교 }
+      - { key: B, title: Animator.StringToHash 로 int 해시, chosen: true }
+    criteria:
+      - label: 비교 비용
+        values:
+          - 문자 단위 대조
+          - int 1회 비교
+      - label: 가독성
+        values:
+          - 이름 그대로
+          - 값만 봐선 모름
+      - label: 준비
+        values:
+          - 없음
+          - 시작 시 정답을 해시로 캐싱
+    reason: >-
+      입력마다 정답과 비교하는데 문자열은 매번 문자 단위로 대조해 상대적으로 비쌉니다. **시작 시 정답 시퀀스를 한 번 해시로
+      만들어 두면 입력 비교가 int 한 번**으로 끝납니다. QTE 는 짧은 시간에 입력이 몰려 비교가 잦으므로 ==해시 비교== 로 바꿨습니다.
+      (규모가 작아 체감 차이는 미미 — "측정했나"를 물으면 **정석 습관** 관점으로 답할 수 있습니다.)
+retrospective:
+  results:
+    - 에디터 재생 랙(`66ms / 15FPS`) — 원인 `EditorLoop` 99.6%(에디터 전용) → 빌드엔 없음
+    - 씬 로드 튐 — 씬 전환에서 Unity 내부 `GC.Collect` 블로킹(`~191ms`)
+    - 지속적 작은 스파이크 — `Gfx.WaitForPresent`(`~14.55ms`)는 GPU 병목이 아니라 **VSync 대기**(빌드 정상)
+  satisfaction:
+    - title: 이동 액션을 원하는 만큼
+      body: 게임을 하며 해보고 싶던 이동 액션(벽 달리기·슬라이딩·활공·워프)을 모두 만족스럽게 구현했습니다.
+    - title: 전투를 이벤트 큐로 분리
+      body: >-
+        모든 피해를 `CombatEvent` 로 만들어 `IFighter` 로 주고받게 해, 송신자가 수신자를 몰라도 되는 결합을 만들었습니다.
+        감지 콜라이더는 **등록만**, `CombatSysytem` 이 `TakeDamage` **호출**을 책임집니다.
+    - title: 벡터 연산을 조작감으로
+      body: 외적·내적·투영이라는 수학이 화면 위 실제 이동으로 이어지는 걸 확인했습니다(수학 → 구현 목표 달성).
+  learnings:
+    - title: 같은 투영이라도 문제에 따라
+      cells:
+        - label: 무엇을
+          body: 벽 달리기를 직관적으로 **투영**으로 짰다.
+        - label: 문제
+          body: '기울어진 벽에서 경사가 진행 방향에 섞여 !!위/아래로 새는 버그!!. 투영은 슬라이딩(경사 하강)엔 맞지만 벽 달리기(수평 유지)엔 안 맞았다.'
+        - label: 알게된 점
+          body: 벡터 연산은 "무엇이 옳다"가 아니라 **문제에 맞는 걸 골라야 한다**는 걸 체감했다(→ ==외적==으로 교체).
+      tint: true
+    - title: sqrt 는 호출 빈도로 판단
+      body: >-
+        적 시야 판정(매 프레임)에선 sqrt·acos 를 피했지만, 점프 높이 계산(입력당 1~2회)에선 `Mathf.Sqrt` 를 그대로 써
+        가독성을 택했습니다. **같은 연산도 빈도에 따라 다르게** 판단해야 한다는 걸 배웠습니다.
+    - title: 스파이크 ≠ 병목
+      body: >-
+        `Gfx.WaitForPresent` 는 무조건 GPU 병목이 아니라 VSync 대기일 수 있고, 에디터 스파이크(`EditorLoop`·씬 로드
+        `GC.Collect`)는 빌드엔 없을 수 있습니다. **프로파일러 수치를 빌드까지 대조**해야 진짜 병목이 보입니다.
+    - title: 보스 AI 단조로움 (아쉬움)
+      body: 보스 AI 가 추격·공격이라는 단순 패턴이라 어색하고 단조로워 보입니다.
+    - title: 연출에 시간 쏠림 (아쉬움)
+      body: Timeline 연출 디테일에 시간을 많이 써, 전투 파트를 원래 구상만큼 완성하지 못했습니다.
+  improvements:
+    - title: 더 지능적인 AI
+      body: 보스 AI 를 추격·공격 루프 너머로 — 유틸리티 AI·행동 트리 등 더 지능적인 패턴을 탐색해 단조로움을 줄입니다.
+    - title: 우선순위 관리
+      body: 연출에 시간이 쏠려 전투를 못 끝낸 걸 반복하지 않게, Todo 리스트로 작업 우선순위를 관리합니다.
+    - title: 이벤트 상한 효과 검증
+      body: 전투 이벤트 프레임당 처리 상한(`Max_Event_COUNT`=10)이 실제로 스파이크를 줄이는지 프로파일러 전후 비교로 검증하거나, 근거가 없으면 수치 주장을 뺍니다.
