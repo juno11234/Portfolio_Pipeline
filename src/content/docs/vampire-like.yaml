@@ -11,7 +11,8 @@
 #           텍스처 전후는 figure-grid · TSV 툴은 image aside.
 #
 # ⚠ hero 캡션: ③ 원본이 소울라이크 예시로 잘못 들어와 있어 같은 gameplay.png 검증 캡션으로 대체.
-# ⚠ improvements: ②가 아직 테스트 문구라, 실제 개선 5건을 기존 문서(26_0717_TechDoc)에서 이어왔다(아래 주석).
+# ⚠ improvements: ②가 아직 테스트 문구다. 기존 문서(26_0717_TechDoc)의 부록에서 이어왔던 5건은 데이터 주도
+#   설계 얘기라 '성능 측정'이라는 이 문서의 주제와 어긋나, 2026-07-22 사용자 결정으로 걷어내고 1건으로 교체했다.
 #   ②를 실제로 채우면 그걸로 교체할 것.
 
 subtitle: 탑뷰 핵 앤 슬래시
@@ -696,17 +697,12 @@ retrospective:
         - label: 해결
           body: '==RGBA 32bit 무압축==으로 적용. 픽셀아트는 해상도가 낮아 메모리 영향이 미미하다.'
         - label: 배운 점
-          body: 안드로이드라고 무조건 압축이 아니라, 그래픽 스타일에 따라 압축도 선택의 문제다.
-  # 개선 계획 — ②가 아직 테스트 문구라, 기존 문서(VamSirLike/Assets/Docs/26_0717_VamSirLike_TechDoc.md)의
-  # 실제 개선 5건을 이어왔다. ①의 '→ 양식 ②' 개선 후보와 일치한다. ②를 채우면 그걸로 교체.
+          body: 안드로이드라고 무조건 텍스처 압축을 적용하는 것이 아니라, 그래픽 스타일에 따라 트레이드 오프의 대상이 된다.
+  # 개선 계획 — 이 문서의 주제는 성능 측정이다. 기존 문서 부록에서 이어왔던 5건(스킬 아이콘 데이터화 ·
+  # 쿨타임 단일 소스화 · StatLevelUp · 구독 해제 · 직업 선택 경로)은 데이터 주도 설계 얘기라 걷어내고,
+  # 측정 관점 1건으로 교체했다(2026-07-22 사용자 결정). 실기기 측정을 아직 안 했다는 것도 사용자 확인.
   improvements:
-    - title: 스킬 아이콘 주소 데이터화
-      body: 스킬 아이콘 주소를 switch에서 SkillData(TSV)로 옮겨, 스킬 추가 시 코드를 건드리지 않게 할 계획입니다.
-    - title: 쿨타임 단일 소스화
-      body: 쿨타임 감소량(0.5f)을 SkillData로 옮겨 표시와 실제가 한 소스를 보게 할 계획입니다.
-    - title: StatLevelUp 살리기 또는 제거
-      body: StatLevelUp에 조회 API를 붙여 기능을 살리거나, 살릴 계획이 없다면 데이터와 열거형을 걷어낼 계획입니다.
-    - title: 구독 해제 보완
-      body: UIManager.OnDestroy에서 PlayerController의 OnHpChanged·OnDeath 구독도 해제할 계획입니다.
-    - title: 직업 선택 경로 개방
-      body: GameInitializer.PlayerWarriorId 하드코딩을 걷어내고 GetSkillList()의 Warrior 고정 필터를 파라미터화해 직업 선택 경로를 열 계획입니다.
+    - title: 모바일 실기기 프로파일링
+      body: >-
+        최적화 전후 측정은 Unity Profiler · Profile Analyzer 로 했고, 실제 모바일기기 프로파일링까지는 하지 못했습니다.
+        다음에는 실기기에서도 측정할 계획입니다.
