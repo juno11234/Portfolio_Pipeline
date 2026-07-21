@@ -1,0 +1,1153 @@
+# Vermintide_Motive_Project (3D-Vermintide) 기술 문서 — 코드 유래 신 파이프라인 산출물.
+#
+# 입력 3양식(src/assets/vermintide/): 1-구현-Vermintide.md(①) · 2-판단-Vermintide.md(②) · 3-자산.md(③).
+#   ①=코드에서 뽑은 사실 · ②=사람의 판단·회고 · ③=스크린샷·링크·확인 메타.
+# 조립하며 ① 이 인용한 코드·수치를 대상 저장소(../3D-Vermintide/Assets/2_Scripts)에서 전부 재확인했다 —
+#   MAX_EVENT_PROCESS_COUNT=10 · 보스 HP 500 · 대검 10/스킬 100 · 총 30 · 회복 50 · 시야 120°/10 ·
+#   SFX 풀 10 · BGM 0.4 · 가드 스태미나 4 · 스킬 게이지 90 전부 코드와 일치.
+#
+# ⚠ 코드의 실제 식별자를 그대로 쓴다(오타 포함) — `Boss.ChageState`(ChangeState 아님) · `GoblinWepon` · `PlayerWepon`.
+# ⚠ 기간: git 첫/마지막 .cs 커밋은 2025.04.14~12.28 이나 47건 중 39건이 4월에 몰려 있고, README 는
+#    2025.04.15~05.02 를 개발 기간으로 명시한다 → 사용자 확인(2026-07-21)으로 `2025.04.14 ~ 05.02`(git 첫 커밋 ~ README 종료일).
+# ⚠ ① 부록의 `SavingSystem` 스텁은 문서에 넣지 않았다 — 구현된 시스템만 다룬다(scope 필드는 07-20 결정으로 전 문서에서 제거됨).
+# ⚠ HashSet 중복 타격 필터는 대검 스킬 콜라이더(`GreatSwordSkill`)에 있다 — ②의 "스윙마다 `OnEnable` 에서 Clear" 와 코드가 일치.
+#
+# 그래프는 전부 mermaid(9개). 스크린샷 7장은 ③ 이 넘긴 파일명 그대로 쓴다.
+# 5단 매핑: overview / architecture(5계층·계약) / features[전투·무기·몬스터보스·풀웨이브·상호작용사운드·최적화] / decisions 5건 / retrospective
+# 장르 표기는 projects.yaml(`1인칭 슈팅`)·대상 repo README 와 맞춘다.
+subtitle: 1인칭 슈팅 — 오브젝트 풀 대규모 웨이브와 패턴 기반 확장 구조
+overview:
+  lead: >-
+    1인칭 시점에서 근접 대검·총·회복 물약을 교체하며 끝없이 밀려오는 고블린 웨이브를 버티고, 보스 골렘을 처치한 뒤
+    탈출하는 **웨이브 생존 액션**입니다. **이벤트 큐 전투 · 전략 패턴 무기 · 상속 몬스터 · 상태 패턴 보스** 네 축 위에
+    오브젝트 풀 · 웨이브 스폰 · 상호작용 미션이 얹혀 있습니다.
+  what: >-
+    이 문서는 `Assets/2_Scripts/` 의 **게임 런타임 로직**(전투 · 무기 · 몬스터/보스 AI · 오브젝트 풀 · 웨이브 ·
+    상호작용 · 사운드 · UI)을 다룹니다 — 클래스끼리 **어떻게 통신하고 어디서 확장되는지**가 지도의 중심입니다.
+  why: >-
+    Vermintide 모티브라 화면을 가득 채우는 **대규모 고블린 웨이브** 위에 무기 3종 · 고블린 4종 · 보스 1종이 얹혀야 했습니다.
+    그래서 설계 목표는 둘이었습니다 — (1) 무기 · 몬스터 · 보스 상태를 **기존 코드 수정 없이 종류만 늘릴 수 있는 확장 구조**로
+    짜는 것, (2) 매 프레임 쏟아지는 피격 처리가 서로 얽히지 않고 **프레임 스파이크 없이** 흐르게 하는 것. 객체끼리 직접
+    호출하는 대신 인터페이스(`IFighter`·`IInteractable`·`IObjectPoolItem`) · 추상 클래스 · 이벤트 큐로 결합을 끊는 방향을 택했습니다.
+  evidence: >-
+    런타임 중 프레임이 **15FPS 이하**로 떨어져 진행이 불가능한 구간이 있었습니다 — 프로파일러에 `Gfx.WaitForPresent` 가 잡혀
+    **CPU 가 GPU 작업을 기다리는** 병목이 원인이었고, Static 배칭 + ==Occlusion Culling== 으로 **60+FPS** 를 회복했습니다.
+    전투에서는 카메라를 급격히 돌리면 한 스윙에 콜라이더가 !!두 번 닿아 데미지가 중복 적용!! 되는 버그가 있어 `HashSet`
+    피격 집합으로 걸렀습니다. 전투 이벤트는 프레임당 처리량을 **10건**으로 제한해 폭주 프레임을 나눠 처리하도록 설계했습니다.
+  stack:
+    title: 대규모 웨이브와 확장 구조를 위한 도구 선택
+    rows:
+      - category: 엔진 · 렌더
+        tech: Unity 2022.3.62f1 · Built-in RP
+        purpose: 3D 액션 런타임 · 렌더링 기반 (manifest 에 URP/HDRP 패키지 없음)
+      - category: 입력
+        tech: Unity Input System 1.14.0
+        purpose: 이동·시점·공격·가드·스킬·슬롯·상호작용·메뉴를 액션 맵으로 분리 바인딩하고 콜백으로 처리
+      - category: AI 이동
+        tech: AI Navigation / NavMesh 1.1.6
+        purpose: 고블린·보스의 플레이어 추격 경로탐색, `OffMeshLink` 로 낙차 구간 점프
+      - category: UI 텍스트
+        tech: TextMeshPro 3.0.7
+        purpose: 상호작용 프롬프트 · 미션 문구 · 탄약 카운트 HUD 렌더
+      - category: 트위닝
+        tech: DOTween (Demigiant)
+        purpose: 피격 넉백 이동 · 사망 시 쓰러지는 회전 연출
+      - category: 사운드
+        tech: Unity Audio · AudioSource 수동 풀
+        purpose: SFX 다중 동시재생·중복 방지, `GameState` 별 BGM 전환
+      - category: 오클루전
+        tech: Umbra (com.unity.modules.umbra)
+        purpose: 비가시 메쉬 컬링으로 GPU 부하 절감 — 15FPS 병목의 해결책
+      - category: 자료구조
+        tech: Queue · Dictionary · HashSet
+        purpose: 이벤트 큐 · 오브젝트 풀(FIFO) · 콜라이더↔전투주체 매핑 · 단일 스윙 중복타격 필터
+screenshot:
+  src: ../../assets/vermintide/Title.png
+  caption: 성 안뜰로 밀려드는 대규모 고블린 웨이브 — 붉은 오라를 두른 엘리트 개체가 무리에 섞여 있다
+meta:
+  team: 1인
+  # git 첫 .cs 커밋 2025.04.14, README 개발 기간 2025.04.15~05.02(커밋 47건 중 39건이 4월). 사용자 확인.
+  period: 2025.04.14 ~ 05.02
+  vcs: Github Desktop
+  engine: Unity 2022.3.62f1 · Built-in RP
+  ide: Rider 2024.3.6
+links:
+  # ③에서 확인. 깃허브 .git 접미사는 canonical 로 정리.
+  - label: 플레이 영상 (YouTube)
+    url: https://youtu.be/PyTk1TvEz9I
+  - label: GitHub 저장소
+    url: https://github.com/juno11234/3D-Vermintide
+architecture:
+  title: 시스템 구조
+  intro: >-
+    모든 전투 상호작용은 각 객체가 서로를 직접 호출하지 않고 **`CombatSystem` 싱글턴의 이벤트 큐**를 경유합니다.
+    엔티티는 `IFighter`, 상호작용물은 `IInteractable`, 풀 대상은 `IObjectPoolItem` 이라는 **인터페이스 계약**으로 묶여
+    구체 타입을 몰라도 같은 타입으로 다뤄지고, 확장 지점마다 추상 클래스(무기 · 몬스터 · 보스 상태)를 두었습니다.
+  parts:
+    - badge: 구성요소
+      title: 5계층 아키텍처 — 매니저에서 표현까지
+      blocks:
+        - type: layers
+          components: >-
+            전역 서비스를 제공하는 **싱글턴 매니저**(`CombatSystem`·`ObjectPoolManager`·`WaveSystem`·`SFXManager`·
+            `BGMManager`·`MissionText`), `IFighter` 를 구현한 **전투 주체**, 세 개의 **인터페이스 계약**,
+            그리고 확장용 **추상 클래스**(`WeaponBase`·`GoblinBase`·`BossState`)로 이루어집니다.
+          relations: >-
+            엔티티끼리는 서로를 **직접 참조하지 않고** `CombatSystem` 을 통해 이벤트로만 통신합니다. 무기는 자신을 소유한
+            `Player` 만, 보스 상태는 자신의 `Boss` 만 압니다. UI·이펙트·게이지는 `CombatSystem.Events` 를 **구독**해
+            역참조 없이 반응합니다.
+          flow: >-
+            입력(`InputManager`) → 이동/무기 발동 → 콜라이더 접촉 → `CombatEvents` 생성·큐 적재 →
+            `CombatSystem.Update` 가 프레임당 최대 10건 처리 → `Receiver.TakeDamage()` + `Events` 브로드캐스트 →
+            HP·스킬 게이지·혈흔·웨이브 카운트 갱신.
+          layers:
+            - name: 매니저 계층 · MANAGER
+              note: 전역 싱글턴 서비스
+              items:
+                - name: CombatSystem
+                  emphasis: true
+                - name: ObjectPoolManager · WaveSystem
+                - name: SFXManager · BGMManager · MissionText
+            - name: 엔티티 계층 · ENTITY
+              note: IFighter 전투 주체
+              items:
+                - name: Player
+                - name: GoblinBase 파생 4종
+                - name: Boss
+            - name: 행동 · 상태 계층 · BEHAVIOR
+              note: 확장용 추상 클래스
+              items:
+                - name: WeaponBase 파생 3종
+                  emphasis: true
+                - name: BossState 파생 3종
+                - name: StateMachineBehaviour · AttackSender
+            - name: 상호작용 · 월드 계층 · WORLD
+              note: IInteractable 8종 + 월드 트리거
+              items:
+                - name: NPC · Cannon · CannonBall · CaveCrystal
+                - name: BossSpawn · GetAmmo · GetPotion · MissionBook
+                - name: Portal · WaveTrigger · Fall
+                  kind: dashed
+            - name: 표현 계층 · PRESENTATION
+              note: 이벤트를 구독만 한다
+              items:
+                - name: PlayerUI
+                - name: BloodControl · BloodParticle
+                - name: TitleBGM · LobbyBGM · DungeonBGM
+    - badge: 관계
+      title: 세 인터페이스 계약 · Class Diagram
+      lede: >-
+        `IFighter` 는 맞을 수 있는 것, `IObjectPoolItem` 은 재사용되는 것, `IInteractable` 은 E 키로 만질 수 있는 것을
+        묶습니다. 상호작용물은 8종이지만 그림에는 셋만 표시했습니다 — 나머지도 같은 계약 하나만 구현합니다.
+      blocks:
+        - type: mermaid
+          question: 전투 · 풀 · 상호작용 세 축은 각각 무슨 계약에 의존하고 누가 구현하나?
+          source: |
+            classDiagram
+                class IFighter {
+                    <<interface>>
+                    +Collider MainCollider
+                    +BloodType bloodType
+                    +TakeDamage(CombatEvents)
+                }
+                class IObjectPoolItem {
+                    <<interface>>
+                    +string Key
+                    +ReturnToPool()
+                }
+                class IInteractable {
+                    <<interface>>
+                    +Interact()
+                    +InteractText() string
+                }
+                class GoblinBase {
+                    <<abstract>>
+                }
+                class Player
+                class Boss
+                class BloodParticle
+                class Cannon
+                class CaveCrystal
+                class BossSpawn
+                IFighter <|.. Player
+                IFighter <|.. GoblinBase
+                IFighter <|.. Boss
+                IObjectPoolItem <|.. GoblinBase
+                IObjectPoolItem <|.. BloodParticle
+                IInteractable <|.. Cannon
+                IInteractable <|.. CaveCrystal
+                IInteractable <|.. BossSpawn
+    - badge: 결합 끊기
+      title: 서로를 모른 채 통신한다
+      blocks:
+        - type: points
+          variant: numbered
+          columns: 3
+          items:
+            - tag: '01'
+              title: 넣기만 · 호출은 시스템이
+              body: 공격 주체는 `CombatEvents` 를 큐에 **넣기만** 하고, `CombatSystem` 이 꺼내 `TakeDamage` 를 호출한다
+            - tag: '02'
+              title: 콜라이더 → 주체 역매핑
+              body: '`Dictionary<Collider, IFighter>` 로 물리가 준 콜라이더에서 전투 주체를 O(1) 로 찾는다'
+            - tag: '03'
+              title: 구독으로 반응
+              body: 혈흔 · 스킬 게이지 · 웨이브 카운트가 `Events` 를 구독해 역참조 없이 각자 반응한다
+features:
+  - title: 이벤트 큐 기반 전투 시스템
+    intro: >-
+      공격 주체(무기 · 고블린 무기 · 보스 발 · 화염구)는 피해를 직접 적용하지 않고 `CombatEvents` 를 만들어 큐에 넣습니다.
+      `CombatSystem.Update` 가 이를 꺼내 처리하며, 프레임당 처리량을 **최대 10건**으로 제한해 폭주를 막습니다.
+    parts:
+      - badge: 흐름
+        title: 타격 한 번이 피해 · 이펙트 · 카운트로 퍼지는 길
+        blocks:
+          - type: mermaid
+            question: 타격 한 번이 피해 · 이펙트 · 게이지로 어떻게 퍼지나?
+            source: |
+              flowchart TD
+                  A["무기 · 화염구 · 보스 발 콜라이더 접촉"] --> B["GetMonsterOrNull · Dictionary 역매핑"]
+                  B --> C["CombatEvents 생성 · Damage · HitPosition"]
+                  C --> D["AddInGameEvent · Queue 적재"]
+                  D -->|"Update · 프레임당 ≤ 10건"| E["Dequeue · switch Type"]
+                  E -->|Combat| F["Receiver.TakeDamage · hp 차감"]
+                  E -->|Combat| G["OnCombatEvent 브로드캐스트"]
+                  G --> H["BloodControl · 혈흔 파티클"]
+                  E -->|EnemyDie| I["OnEnemyDieEvents 브로드캐스트"]
+                  I --> J["WaveSystem · 남은 적 카운트"]
+                  I --> K["WeaponCool · 스킬 게이지 +0.5"]
+          - type: code
+            api: CombatSystem.Update() · 큐에서 꺼내 처리 + 프레임당 상한
+            code: |-
+              int processCount = 0;
+
+              while (inGameEventQueue.Count > 0 && processCount < MAX_EVENT_PROCESS_COUNT)
+              {
+                  var inGameEvent = inGameEventQueue.Dequeue();
+
+                  switch (inGameEvent.Type)
+                  {
+                      case InGameEvent.EventType.Combat:
+                          var combatEvent = inGameEvent as CombatEvents;
+                          inGameEvent.Receiver.TakeDamage(combatEvent);
+                          Events.OnCombatEvent?.Invoke(combatEvent);
+                          break;
+                      case InGameEvent.EventType.EnemyDie:
+                          var enemyDieEvents = inGameEvent as EnemyDieEvents;
+                          Events.OnEnemyDieEvents?.Invoke(enemyDieEvents);
+                          break;
+                  }
+
+                  processCount++;
+              }
+            notes:
+              - at: processCount < MAX_EVENT_PROCESS_COUNT
+                why: 한 프레임 처리량을 10건으로 묶는다. 남은 이벤트는 다음 프레임으로 이월돼 타격이 몰려도 부하가 평탄해진다. 즉시 호출 대신 큐를 쓴 이유가 여기다.
+              - at: Events.OnCombatEvent?.Invoke
+                why: 피해를 적용한 뒤 같은 이벤트를 구독자에게 흘린다. 혈흔·게이지·카운트가 전투 코드에 이름을 남기지 않고 반응한다.
+          - type: table
+            headers: [이벤트, 실린 정보, 처리]
+            rows:
+              - ['`CombatEvents`', 'Sender · Receiver · Damage · HitPosition · Collider', '`TakeDamage` 호출 + `OnCombatEvent` 발행']
+              - ['`EnemyDieEvents`', '추가 필드 없음 (Receiver 만)', '`OnEnemyDieEvents` 발행']
+      - badge: 역매핑
+        title: 물리는 콜라이더를 주고, 피해는 주체가 받는다
+        lede: >-
+          충돌이 주는 것은 `Collider` 지만 피해를 받아야 할 것은 `IFighter` 입니다. 그 사이를 딕셔너리 한 장이 잇습니다.
+          보스는 몸 · 양팔 · 양다리 **5개 콜라이더**를 같은 `Boss` 인스턴스에 등록해 어느 부위를 맞아도 단일 HP 에 반영됩니다.
+        blocks:
+          - type: code
+            api: GreatSword.OnTriggerEnter() · 콜라이더에서 주체를 찾아 이벤트만 남긴다
+            code: |-
+              if (LayerMask.NameToLayer("Enemy") == other.gameObject.layer)
+              {
+                  var monster = CombatSystem.Instance.GetMonsterOrNull(other);
+                  if (monster != null)
+                  {
+                      CombatEvents combatEvents = new CombatEvents()
+                      {
+                          Sender = Player.CurrentPlayer,
+                          Receiver = monster,
+                          Damage = damage,
+                          HitPosition = other.ClosestPoint(transform.position),
+                          Collider = other
+                      };
+
+                      CombatSystem.Instance.AddInGameEvent(combatEvents);
+                  }
+              }
+            notes:
+              - at: GetMonsterOrNull(other)
+                why: '`Dictionary<Collider, IFighter>` 조회 한 번으로 콜라이더를 전투 주체로 바꾼다. 무기는 상대가 고블린인지 보스인지 알 필요가 없다.'
+              - at: HitPosition = ClosestPoint
+                why: 맞은 지점을 이벤트에 함께 실어 보낸다. 혈흔 파티클이 이 좌표만 보고 재생되므로 무기 코드는 이펙트를 모른다.
+      - badge: 애니메이션
+        title: 타격 창을 애니메이션이 소유한다
+        lede: >-
+          타격 판정은 코드 타이머가 아니라 **애니메이션 상태의 진행도(`normalizedTime`)** 로 열고 닫습니다.
+          `StateMachineBehaviour` 를 상속한 세 Sender 가 스윙 모션에서 칼이 실제로 지나가는 구간에만 콜라이더를 켭니다.
+        blocks:
+          - type: chips
+            variant: flow
+            items:
+              - label: OnStateEnter · 플래그 리셋
+              - label: normalizedTime > start · 콜라이더 On
+              - label: normalizedTime > end · 콜라이더 Off
+          - type: code
+            api: PlayerAttackSender.OnStateUpdate() · 정규화 시간으로 타격 창 개폐
+            code: |-
+              if (passStartNormalizedTime==false && startNormalizedTime < stateInfo.normalizedTime)
+              {
+                  SFXManager.Instance.Play(attack1);
+                  player.AttackStart();
+                  passStartNormalizedTime = true;
+              }
+
+              if (passEndNormalizedTime==false && endNormalizedTime < stateInfo.normalizedTime)
+              {
+                  player.AttackEnd();
+                  passEndNormalizedTime = true;
+              }
+            notes:
+              - at: start · endNormalizedTime
+                why: 인스펙터에서 잡는 0~1 구간이다. 판정 타이밍을 코드가 아니라 애니메이션 클립이 소유하므로, 모션을 바꾸면 값만 다시 잡으면 된다.
+              - at: pass* 래치 플래그
+                why: '`OnStateUpdate` 는 매 프레임 불린다. 한 상태에서 켜고 끄는 일이 각각 한 번만 일어나도록 잠근다.'
+      - badge: 중복 타격
+        title: 한 스윙에 같은 대상은 한 번만
+        lede: >-
+          콜라이더가 열려 있는 동안 카메라를 급회전하면 한 스윙에 같은 적에게 !!데미지가 두 번 들어가는!! 버그가 있었습니다.
+          공격자가 **이번 스윙에 맞힌 대상**을 집합으로 들고 있다가, 콜라이더가 켜질 때 비웁니다.
+        blocks:
+          - type: code
+            api: GreatSwordSkill · 피격 집합으로 중복 타격 필터
+            code: |-
+              private HashSet<IFighter> damaged = new HashSet<IFighter>();
+
+              private void OnEnable()
+              {
+                  damaged.Clear();
+              }
+
+              private void OnTriggerEnter(Collider other)
+              {
+                  var monster = CombatSystem.Instance.GetMonsterOrNull(other);
+                  if (monster != null && damaged.Contains(monster) == false)
+                  {
+                      // ... CombatEvents 생성 후
+                      CombatSystem.Instance.AddInGameEvent(combatEvents);
+                      damaged.Add(monster);
+                  }
+              }
+            notes:
+              - at: damaged.Clear() in OnEnable
+                why: 콜라이더가 켜지는 순간이 곧 새 스윙의 시작이다. 초기화 시점을 따로 관리하지 않아도 스윙 단위가 저절로 맞는다.
+              - at: damaged.Contains(monster) == false
+                why: '`HashSet` 조회는 O(1) 이고, "이번 스윙에 내가 맞힌 대상"이라는 상태를 공격자 한 곳이 소유한다.'
+      - badge: 이펙트 분리
+        title: 혈흔은 전투를 모른다
+        lede: >-
+          `BloodControl` 은 전투 이벤트를 **구독만** 합니다. 전투 코드에는 혈흔이라는 단어가 없고, 피격 대상의
+          `bloodType` 과 이벤트에 실려 온 명중 좌표만으로 파티클이 재생됩니다.
+        blocks:
+          - type: code
+            api: BloodControl.PlayBlood() · 이벤트 구독 + bloodType 분기
+            code: |-
+              void Start()
+              {
+                  CombatSystem.Instance.Events.OnCombatEvent += PlayBlood;
+              }
+
+              private void PlayBlood(CombatEvents combatEvent)
+              {
+                  switch (combatEvent.Receiver.bloodType)
+                  {
+                      case BloodType.Player:
+                          return;
+                      case BloodType.Monster:
+                          var blood = ObjectPoolManager.Instance.GetObjectOrNull("Blood");
+                          blood.GameObject.transform.position = combatEvent.HitPosition;
+                          blood.GameObject.SetActive(true);
+                          break;
+                      case BloodType.Boss:
+                          var Bossblood = ObjectPoolManager.Instance.GetObjectOrNull("BossBlood");
+                          Bossblood.GameObject.transform.position = combatEvent.HitPosition;
+                          Bossblood.GameObject.SetActive(true);
+                          break;
+                  }
+              }
+            notes:
+              - at: Receiver.bloodType
+                why: 표현의 분기를 인터페이스 속성 하나로 처리한다. 이펙트를 늘려도 전투 코드는 그대로다.
+              - at: 1인칭이라 Player 는 return
+                why: 자기 몸이 화면에 없으므로 플레이어 피격 혈흔은 생략한다. 파티클은 재생이 끝나면 스스로 풀에 돌아간다.
+  - title: 전략 패턴 무기 교체 시스템
+    intro: >-
+      `Player` 는 구체 무기를 모른 채 `WeaponBase` 부모 타입(`currentWeapon`)으로만 호출합니다.
+      무기를 늘리는 일이 **`Player` 수정 없이 클래스 추가**로 끝나게 하는 것이 목표였습니다.
+    parts:
+      - badge: 구조
+        title: 부모 타입 하나로 다루는 무기 3종
+        blocks:
+          - type: mermaid
+            question: 무기를 어떻게 확장 가능하게 추상화했나?
+            source: |
+              classDiagram
+                  class WeaponBase {
+                      <<abstract>>
+                      +RuntimeAnimatorController AnimatorController
+                      +RMBClick()*
+                      +Skill()
+                      +RightClick(bool)
+                      +Reload()
+                      +CanGuard() bool
+                      +CanSkill() bool
+                  }
+                  class GreatSword {
+                      -int damage = 10
+                      +TryGuard(int) bool
+                  }
+                  class Gun {
+                      -int damage = 30
+                      -int maxAmmo = 5
+                      +Reload() 코루틴
+                  }
+                  class Potion {
+                      +Heal 50 후 슬롯0 복귀
+                  }
+                  class Player {
+                      -WeaponBase currentWeapon
+                      -WeaponBase[] weaponSlots
+                      +EquipWeaponByIndex(int)
+                  }
+                  WeaponBase <|-- GreatSword
+                  WeaponBase <|-- Gun
+                  WeaponBase <|-- Potion
+                  Player o-- WeaponBase : 부모 타입에만 의존
+          - type: chips
+            variant: flow
+            items:
+              - label: 숫자 키 1 · 2 · 3
+              - label: EquipWeaponByIndex
+              - label: 이전 무기 SetActive false
+              - label: 새 무기 SetActive true
+              - label: AnimatorController 교체
+          - type: table
+            headers: [무기, 공격 방식, 데미지, 특수]
+            rows:
+              - ['GreatSword', '근접 스윙 · 콜라이더 On/Off', '10 (스킬 100)', '가드 · 광역 스킬']
+              - ['Gun', 'Raycast 히트스캔', '30', '탄약 5 · 재장전 2초']
+              - ['Potion', '사용 즉시', '—', '회복 +50 후 슬롯 0 복귀']
+      - badge: 전략별 행동
+        title: 가드는 무기가 피해 처리에 개입한다
+        lede: >-
+          가드는 대검만 가진 행동이라 `Player` 가 아는 유일한 예외입니다. 패턴 매칭 한 줄로 **최소한만** 노출하고,
+          가드 성공 시 피해를 흡수한 뒤 조기 반환합니다.
+        blocks:
+          - type: code
+            api: Player.TakeDamage() · 가드 우선 분기
+            code: |-
+              public void TakeDamage(CombatEvents combatEvent)
+              {
+                  if (currentWeapon is GreatSword sword && sword.TryGuard(combatEvent.Damage))
+                  {
+                      SFXManager.Instance.Play(guard);
+                      return;
+                  }
+
+                  if (isDead) return;
+                  SFXManager.Instance.Play(hit);
+                  stat.hp -= combatEvent.Damage;
+                  if (stat.hp <= 0)
+                  {
+                      Die();
+                  }
+              }
+            notes:
+              - at: currentWeapon is GreatSword sword
+                why: 오직 대검만 가드를 가지므로 전략별 특수 행동을 여기 한 줄로 좁힌다. 나머지 호출은 전부 부모 타입으로 나간다.
+              - at: TryGuard 성공 시 return
+                why: 가드가 성립하면 피해를 완전히 흡수한다. 스태미나 소모·쿨다운 판단은 무기 쪽 책임이다.
+          - type: code
+            api: GreatSword.TryGuard() · 데미지 비례 스태미나 소모 + 소진 시 쿨다운
+            code: |-
+              public bool TryGuard(int damage)
+              {
+                  if (CanGuard() == false || isGuarding == false) return false;
+
+                  int staminaConsume = damage / 5;
+                  cool.currentStamina -= staminaConsume;
+
+                  if (cool.currentStamina <= 0)
+                  {
+                      cool.currentStamina = 0;
+                      animator.SetBool(BLOCK, false);
+                      cool.inCooldown = true;
+                  }
+
+                  return true;
+              }
+            notes:
+              - at: damage / 5
+                why: 큰 피해일수록 스태미나를 더 깎는다. 최대 4 스태미나라 강한 공격을 연달아 막을 수 없다.
+              - at: inCooldown = true
+                why: 스태미나가 바닥나면 3초 쿨다운에 들어가 무한 가드를 막는다. 회복은 초당 1이다.
+          - type: callout
+            badge: 지속 상태
+            tone: tint
+            body: >-
+              쿨타임 · 스태미나 · 스킬 게이지는 무기가 아니라 **항상 켜져 있는 `WeaponCool`** 이 들고 있습니다.
+              무기를 교체하면 이전 무기가 `SetActive(false)` 되어 그 `Update` 가 멈추기 때문입니다(→ 회고 참조).
+              스킬 게이지는 시간당 자동 충전에 더해, `OnEnemyDieEvents` 를 구독해 **적 처치마다 +0.5** 를 얹습니다(최대 90).
+  - title: 상속 몬스터 · 상태 패턴 보스
+    intro: >-
+      잡몹은 **상속**으로, 보스는 **상태 패턴**으로 확장 지점을 열었습니다. 고블린 4종은 공통 골격을 부모가 갖고
+      차이만 `override` 하며, 보스는 상태를 각각의 클래스이자 GameObject 로 분리했습니다.
+    parts:
+      - badge: 상속
+        title: 공통은 부모에, 차이는 자식에
+        lede: >-
+          `GoblinBase` 가 NavMesh 추격 · 사거리 진입 시 공격 · 피격/사망 · 오브젝트 풀 반납 · 거리 기반 그르렁 사운드를
+          모두 담당하고, 자식은 재정의 지점만 덮어씁니다.
+        blocks:
+          - type: mermaid
+            question: 고블린 종을 어떻게 상속으로 확장했나 — 자식은 무엇만 바꾸나?
+            source: |
+              classDiagram
+                  class GoblinBase {
+                      <<abstract>>
+                      +TakeDamage(CombatEvents)
+                      +ReturnToPool()
+                      #VirtualUpdate()
+                      +WeaponCollOn()
+                      +WeaponCollOff()
+                      #OffParticle()
+                      #PoolDeque()
+                  }
+                  class WaveGoblin
+                  class PatrolGoblin
+                  class EliteGoblin
+                  class ShamanGoblin
+                  GoblinBase <|-- WaveGoblin : 재정의 없음
+                  GoblinBase <|-- PatrolGoblin : VirtualUpdate · PoolDeque
+                  GoblinBase <|-- EliteGoblin : OffParticle
+                  GoblinBase <|-- ShamanGoblin : WeaponCollOn · Off · OffParticle
+          # 네 장의 원본 크기가 제각각이다(193×377 ~ 695×499). 폭 100% 로 두면 작은 것이
+          # 2.18배까지 늘어나 뭉개지고, 짧은 쪽 칸에 300px 넘는 빈 공간이 생겼다.
+          # → 높이 280 으로 통일하고 비율대로 폭을 박아 **확대를 없앴다**(전부 축소만).
+          - type: figure-grid
+            cells:
+              - src: ../../assets/vermintide/Wave.png
+                caption: '**WaveGoblin** — 재정의 없는 기본형. 웨이브의 몸통을 이룬다'
+                background: '#fff'
+                width: 143
+                height: 280
+              - src: ../../assets/vermintide/Patrol.png
+                caption: '**PatrolGoblin** — 순찰 경로를 돌다 시야에 들어오면 추격으로 전환'
+                background: '#fff'
+                width: 236
+                height: 280
+          - type: figure-grid
+            cells:
+              - src: ../../assets/vermintide/Burserker.png
+                caption: '**EliteGoblin** — 붉은 오라 파티클을 두른 광전사형. `OffParticle` 만 재정의'
+                background: '#fff'
+                width: 390
+                height: 280
+              - src: ../../assets/vermintide/Shaman.png
+                caption: '**ShamanGoblin** — 근접 콜라이더 대신 화염구를 쏘는 원거리형'
+                background: '#fff'
+                width: 200
+                height: 280
+          - type: code
+            api: ShamanGoblin · 부모의 '무기 콜라이더 켜기'를 투사체 생성으로 대체
+            code: |-
+              public override void WeaponCollOn()
+              {
+                  Instantiate(fireBallPrefabs, firePoint.position, Quaternion.identity);
+              }
+
+              public override void WeaponCollOff()
+              {
+              }
+            notes:
+              - at: WeaponCollOn 재정의
+                why: 근접 종을 원거리 종으로 바꾸는 데 재정의 하나면 된다. 공격 타이밍을 통지하는 `GoblinAttackSender` 는 부모와 똑같이 재사용된다.
+              - at: WeaponCollOff 는 빈 몸
+                why: 샤먼은 켜고 끌 근접 콜라이더 자체가 없다. 부모가 호출해도 아무 일이 없도록 비운다.
+      - badge: 행동
+        title: 순찰 → 추격 → 공격, 그리고 낙차 점프
+        lede: >-
+          `GoblinBase.VirtualUpdate` 는 플레이어와의 거리 하나로 추격/공격을 가릅니다. `PatrolGoblin` 만 그 앞에
+          순찰·발각 판정을 덧대며, `WaveGoblin` 계열은 순찰 없이 추격에서 시작합니다.
+        blocks:
+          - type: mermaid
+            question: 고블린은 언제 순찰 · 추격 · 공격 · 점프로 바뀌나?
+            source: |
+              stateDiagram-v2
+                  direction LR
+                  [*] --> Patrol
+                  Patrol --> Chase: 시야 발각 · 피격
+                  Chase --> Attack: 거리 < range
+                  Attack --> Chase: 거리 > range
+                  Chase --> Jump: OffMeshLink 진입
+                  Jump --> Chase: CompleteOffMeshLink
+                  Chase --> Dead: hp ≤ 0
+                  Attack --> Dead: hp ≤ 0
+                  Dead --> [*]: 3초 후 풀 반납
+          - type: code
+            api: PatrolGoblin.WatchPlayer() · 시야각 · 거리 · 차폐 3중 판정
+            code: |-
+              if (goblinStat.hp < goblinStat.maxHp)
+              {
+                  ChaseStart();
+                  return;
+              }
+
+              Vector3 direction = (Player.CurrentPlayer.transform.position - transform.position);
+              float distance = direction.magnitude;
+              direction.Normalize();
+              float angle = Vector3.Angle(transform.forward, direction);
+
+              if (angle > viewAngle * 0.5f || distance > viewDistance) return;
+
+              Physics.Raycast(transform.position + Vector3.up, direction, out RaycastHit hit, viewDistance);
+              if (hit.collider == Player.CurrentPlayer.MainCollider)
+              {
+                  ChaseStart();
+              }
+            notes:
+              - at: hp < maxHp 면 즉시 추격
+                why: 등 뒤에서 맞았는데 계속 순찰하면 어색하다. 피격 자체를 발각 신호로 삼는다.
+              - at: 각도·거리 통과 후에만 Raycast
+                why: 값싼 판정을 먼저 세워 대부분을 걸러내고, 통과한 경우에만 레이캐스트로 벽 뒤 은폐를 확인한다.
+          - type: table
+            headers: [항목, 값]
+            rows:
+              - ['시야각 viewAngle', '120°']
+              - ['시야거리 viewDistance', '10']
+              - ['순찰 속도 → 추격 속도', '2 → 6']
+              - ['낙차 점프', '`Sin` 곡선 포물선 후 `CompleteOffMeshLink`']
+              - ['사망 후 풀 반납 지연', '3초']
+      - badge: 상태 패턴
+        title: 보스 상태를 GameObject 로 캡슐화
+        lede: >-
+          `BossState` 파생 스크립트를 자식 오브젝트에 붙이고, `Boss.Start` 가 `GetComponentsInChildren` 으로 모아
+          딕셔너리에 등록합니다. 전이는 **이전 상태 비활성화 + 새 상태 활성화** 한 쌍으로 끝납니다.
+        blocks:
+          - type: mermaid
+            question: 보스는 어떤 조건으로 상태를 오가나?
+            source: |
+              stateDiagram-v2
+                  [*] --> ChaseState
+                  ChaseState --> JumpAttackState: 거리 < 4 · 무작위
+                  ChaseState --> FootAttackState: 거리 < 4 · 무작위
+                  JumpAttackState --> ChaseState: normalizedTime > exitTime
+                  FootAttackState --> ChaseState: normalizedTime > exitTime
+                  ChaseState --> Dead: HP ≤ 0
+                  Dead --> [*]
+          - type: code
+            api: Boss.ChageState() · 딕셔너리 기반 상태 교체
+            code: |-
+              public void ChageState(BossState.StateName enterState)
+              {
+                  if (CurrentState != null)
+                  {
+                      BossState prev = CurrentState;
+                      prev.Exit();
+                      prev.gameObject.SetActive(false);
+                  }
+
+                  BossState targetState = stateDictionary[enterState];
+                  CurrentState = targetState;
+                  targetState.gameObject.SetActive(true);
+                  targetState.Enter();
+              }
+            notes:
+              - at: stateDictionary[enterState]
+                why: 이름(enum)으로 상태를 꺼낸다. 상태를 추가할 때 전이 코드는 손대지 않고 자식 오브젝트에 스크립트만 붙이면 된다.
+              - at: SetActive 토글
+                why: 상태를 GameObject 로 두었기 때문에 활성/비활성이 곧 상태의 시작과 끝이다. 각 상태의 `Update` 가 자기 차례에만 돈다.
+          - type: code
+            api: ChaseState.Update() · 사거리 진입 시 무작위 공격 선택
+            code: |-
+              float distance = Vector3.Distance(player.transform.position, boss.transform.position);
+              SFXManager.Instance.PlayNoDuplicate(growlingSFX);
+              if (distance < attackRange)
+              {
+                  agent.ResetPath();
+                  animator.SetFloat(SPEED, 0f);
+                  int nextAttackTrigger = Random.Range(0, bossAttacks.Length);
+                  int stateValue = nextAttackTrigger + 1;
+                  animator.SetTrigger(bossAttacks[nextAttackTrigger]);
+                  boss.ChageState((StateName)stateValue);
+              }
+            notes:
+              - at: stateValue = nextAttackTrigger + 1
+                why: 트리거 배열의 순서와 `StateName` enum 순서를 맞춰 두어, 뽑은 공격의 애니메이션과 상태를 함께 전환한다.
+              - at: 공격 상태의 복귀
+                why: 각 공격 상태는 `normalizedTime > exitTime` 이 되면 스스로 `ChaseState` 로 돌아간다. 전이 조건이 상태 안에 있다.
+          - type: table
+            headers: [항목, 값]
+            rows:
+              - ['보스 HP', '500 (부위 5곳이 단일 HP 공유)']
+              - ['부위 콜라이더', 'Body · LeftArm · RightArm · LeftLeg · RightLeg']
+              - ['FootAttack 데미지', '20 · 명중 시 넉백']
+              - ['JumpAttack 데미지', '30 · 명중 시 넉백']
+              - ['근접 전환 거리 attackRange', '4']
+  - title: 오브젝트 풀 · 웨이브 스폰
+    intro: >-
+      대규모 웨이브의 부하를 두 곳에서 나눕니다 — **생성 비용은 오브젝트 풀**이 게임 시작으로 몰아주고,
+      **소환 위치는 웨이브 시스템**이 플레이어 최근접 2지점으로 좁힙니다.
+    parts:
+      - badge: 오브젝트 풀
+        title: 만들지 않고 빌려 쓴다
+        lede: >-
+          `ObjectPoolManager` 가 `Dictionary<string, ObjectPool>` 로 프리팹별 풀을 들고, 각 풀은 `IObjectPoolItem` 을
+          담는 `Queue` 입니다. 시작 시 `ExpandSize` 만큼 미리 만들어 런타임 `Instantiate` 부하를 초기 로딩으로 옮깁니다.
+        blocks:
+          - type: mermaid
+            question: 풀에서 객체가 어떻게 나가고 돌아오나?
+            source: |
+              flowchart LR
+                  A["GetObjectOrNull · key"] --> B{"Pool 비었나?"}
+                  B -->|"예"| C["Expand · ExpandSize 만큼 Instantiate"]
+                  C --> D["Dequeue"]
+                  B -->|"아니오"| D
+                  D --> E["SetActive true · 사용"]
+                  E --> F["사망 3초 후 ReturnToPool"]
+                  F --> G["SetActive false · Enqueue"]
+                  G -.->|"재사용"| A
+          - type: code
+            api: ObjectPool.GetItem() · 비었으면 확장 후 Dequeue
+            code: |-
+              public IObjectPoolItem GetItem()
+              {
+                  if (Pool.Count == 0)
+                  {
+                      Expand();
+                  }
+
+                  return Pool.Dequeue();
+              }
+            notes:
+              - at: Pool.Count == 0 → Expand
+                why: 예열분이 떨어져도 게임이 멈추지 않도록 그 자리에서 늘린다. 늘어난 만큼은 이후 계속 재사용된다.
+              - at: Queue · FIFO
+                why: 중간 접근을 포기하는 대신 입출력을 O(1) 로 얻는다. `Destroy`/`Instantiate` 를 없애 GC 스파이크도 함께 사라진다.
+          - type: table
+            headers: [항목, 내용]
+            rows:
+              - ['`ObjectPoolData` 필드', 'Key · Prefab · ExpandSize · Parent']
+              - ['등록 풀 키', '`Goblin_1` · `Goblin_2` · `Goblin_Elite` · `Goblin_Shaman` · `Blood` · `BossBlood`']
+              - ['반납 주체', '고블린은 사망 3초 후, 혈흔은 파티클 재생 종료 시 스스로']
+      - badge: 웨이브
+        title: 가장 가까운 두 지점에서 협공하듯
+        lede: >-
+          모든 스폰 지점과 플레이어의 거리를 **한 번의 순회로** 재 1·2등만 추립니다. 정렬하지 않고 O(n) 으로 끝내고,
+          플레이어 양쪽에서 밀려오는 그림을 만듭니다.
+        blocks:
+          - type: mermaid
+            question: 웨이브가 어떤 판단으로 무엇을 소환하나?
+            source: |
+              flowchart TD
+                  T["타이머 waveDelay 경과"] --> W["WaveStart · Wave BGM 전환"]
+                  G["WaveTrigger 접촉 · 포탄 발사"] --> W
+                  W --> S["SpawnPointSet · 최근접 2지점"]
+                  S --> E{"엘리트 웨이브? eliteWaveRate"}
+                  E -->|"당첨"| EW["엘리트/샤먼 eliteSpawnAmount 마리"]
+                  E -->|"아님"| DW["두 지점 × amount"]
+                  DW --> R{"개체별 waveEliteRate"}
+                  R -->|"당첨"| RE["Goblin_Elite · Goblin_Shaman"]
+                  R -->|"아님"| RN["Goblin_1 · Goblin_2"]
+                  EW --> P["풀에서 꺼내 SetActive true"]
+                  RE --> P
+                  RN --> P
+          - type: code
+            api: WaveSystem.SpawnPointSet() · 단일 순회로 최근접 2지점 선택
+            code: |-
+              for (int i = 0; i < set.spawnPoint.Length; i++)
+              {
+                  //min보다 작다면
+                  if (distance[i] < min)
+                  {
+                      //처음것을 두번째min에 덮어씌움
+                      min2 = min;
+                      second = first;
+
+                      //작은 것을 첫번째min에
+                      min = distance[i];
+                      first = i;
+                  }
+                  else if (distance[i] < min2)
+                  {
+                      min2 = distance[i];
+                      second = i;
+                  }
+              }
+
+              return new[] { set.spawnPoint[first], set.spawnPoint[second] };
+            notes:
+              - at: 1등 갱신 시 이전 1등을 2등으로
+                why: 정렬 없이 한 번의 순회로 1·2등을 얻는다. 스폰 지점이 늘어도 비용이 선형으로만 는다.
+              - at: 두 지점을 쓰는 이유
+                why: 한 곳에서만 나오면 뒤로 물러서서 잡을 수 있다. 양쪽에서 밀려와야 웨이브를 버티는 긴장이 생긴다.
+          - type: table
+            headers: ['WaveSetting 파라미터', 뜻]
+            rows:
+              - ['waveDelay · timerWaveAmount', '타이머 웨이브 주기와 소환 수']
+              - ['waveEliteRate', '일반 웨이브 안에서 개체가 엘리트/샤먼일 확률']
+              - ['eliteWaveRate · eliteSpawnAmount', '웨이브 전체가 엘리트일 확률과 그때의 소환 수']
+              - ['waveCounter', '`OnEnemyDieEvents` 구독으로 감소 · 1 이하면 던전 BGM 복귀']
+  - title: 상호작용 미션 · 사운드
+    intro: >-
+      상호작용물은 로직이 제각각이지만 플레이어는 `IInteractable` 하나만 압니다. 그 상호작용이 미션 문구와 웨이브 ·
+      보스 · 문을 움직이며 게임을 진행시키고, 사운드는 `GameState` 를 따라갑니다.
+    parts:
+      - badge: 계약
+        title: 플레이어는 인터페이스만 안다
+        lede: >-
+          카메라 정면으로 `Interactables` 레이어만 골라 레이캐스트하고, 맞은 것을 인터페이스로 받아 프롬프트를 띄웁니다.
+          E 를 누르면 `Interact()` 를 호출할 뿐 무슨 일이 일어나는지는 대상이 정합니다.
+        blocks:
+          - type: code
+            api: PlayerMovement.ShowInteractText() · 정면 레이캐스트로 대상 탐지
+            code: |-
+              Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+              if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, LayerMask.GetMask("Interactables")))
+              {
+                  var interactable = hit.collider.GetComponent<IInteractable>();
+                  if (interactable != null)
+                  {
+                      currentInteractable = interactable;
+                      interactText.gameObject.SetActive(true);
+                      string text = interactable.InteractText();
+                      interactText.text = text;
+                      return;
+                  }
+              }
+
+              currentInteractable = null;
+              interactText.gameObject.SetActive(false);
+            notes:
+              - at: GetComponent<IInteractable>()
+                why: 인터페이스로 받으므로 대포든 크리스탈이든 물약이든 같은 코드가 처리한다. 상호작용물을 늘려도 플레이어는 그대로다.
+              - at: InteractText() 를 매 프레임 물어봄
+                why: 프롬프트 문구를 대상이 상황에 따라 바꾼다 — 포탄이 없으면 `need Cannonball`, 있으면 `[E] Fire`.
+          - type: table
+            headers: [상호작용물, 프롬프트, 하는 일]
+            rows:
+              - ['CaveCrystal', '`[E] destroy the crystal`', '문 파괴 · 미션을 통로 탐색으로']
+              - ['CannonBall / Cannon', '`[E] Pick up` / `[E] Fire`', '포탄 획득 후 발사 · 3회로 단계 진행 + 웨이브 유발']
+              - ['BossSpawn', '`[E] Destroy the Staff`', '차지 → 폭발 → 보스 활성화 + 보스 BGM']
+              - ['GetAmmo / GetPotion', '`[E] Get Ammo` / `[E] Get Potion`', '탄약 · 물약 획득 (물약은 슬롯 3 해금)']
+              - ['NPC / MissionBook', '`[E] Quest` / `[E] Mission Select`', '로비의 퀘스트 · 미션 선택 UI']
+      - badge: 미션
+        title: 크리스탈에서 탈출까지
+        lede: >-
+          미션 진행에 별도 매니저가 없습니다. 각 상호작용물이 `MissionText.Instance.TextUpdate(...)` 로 목표를 갱신하고
+          다음 단계를 여는 방식으로, 진행 자체가 상호작용의 부수 효과입니다.
+        blocks:
+          - type: chips
+            variant: flow
+            items:
+              - label: 크리스탈 파괴
+              - label: 통로 탐색
+              - label: 포탄 3회 발사
+              - label: 스태프 파괴 · 보스 소환
+              - label: 골렘 처치
+              - label: 시작 지점으로 탈출
+          - type: code
+            api: Cannon.Interact() · 발사 횟수로 미션 단계 전이
+            code: |-
+              switch (fireCount)
+              {
+                  case < 2:
+                      MissionText.Instance.TextUpdate($"Find the Cannonball and fire it. {fireCount} / 3 ");
+                      WaveSystem.Instance.WaveStart(10);
+                      WaveSystem.Instance.set.waveDelay = 20;
+                      break;
+                  case 2:
+                      MissionText.Instance.TextUpdate($"Find the Cannonball and fire it. {fireCount} / 3 ");
+                      break;
+                  case > 2:
+                      MissionText.Instance.TextUpdate("Destroy the staff");
+                      WaveSystem.Instance.set.waveDelay = 180;
+                      Destroy(rock);
+                      enabled = false;
+                      break;
+              }
+            notes:
+              - at: waveDelay 20 → 180
+                why: 포탄을 찾아다니는 구간에는 20초마다 웨이브를 밀어 압박하고, 스태프 단계로 넘어가면 180초로 늦춰 숨통을 튼다.
+              - at: 'enabled = false'
+                why: 3회를 채운 대포는 스스로 비활성화된다. 다 쓴 상호작용물이 남아 프롬프트를 띄우는 일을 막는다.
+      - badge: 사운드
+        title: GameState 가 BGM 을 정한다
+        lede: >-
+          `BGMManager`(DontDestroyOnLoad)가 `Dictionary<GameState, AudioClip>` 을 들고 상태가 바뀔 때만 곡을 갈아 끼웁니다.
+          SFX 는 `AudioSource` 10개를 수동 풀로 돌리며 같은 클립의 중복 재생을 막습니다.
+        blocks:
+          - type: mermaid
+            question: BGM 은 게임 상황에 따라 어떻게 바뀌나?
+            source: |
+              stateDiagram-v2
+                  direction LR
+                  [*] --> Title
+                  Title --> Idle: 로비 진입
+                  Idle --> Dungeon: 던전 진입
+                  Dungeon --> Wave: WaveStart
+                  Wave --> Dungeon: 남은 적 ≤ 1
+                  Dungeon --> Boss: BossSpawn
+                  Boss --> Escape: 보스 사망
+          - type: code
+            api: SFXManager.PlayNoDuplicate() · 동일 클립 중복 차단 + 피치 변주
+            code: |-
+              public void PlayNoDuplicate(SFXData sfxData)
+              {
+                  foreach (AudioSource source in audioSourcesArray)
+                  {
+                      if (source.isPlaying && source.clip == sfxData.clip)
+                          return;
+                  }
+
+                  foreach (var sources in audioSourcesArray)
+                  {
+                      if (sources.isPlaying == false)
+                      {
+                          sources.clip = sfxData.clip;
+                          sources.pitch = Random.Range(0.95f, 1.05f);
+                          sources.volume = sfxData.volume;
+                          sources.Play();
+                          return;
+                      }
+                  }
+              }
+            notes:
+              - at: 같은 클립이 재생 중이면 return
+                why: 고블린이 수십 마리라 그르렁·타격음이 그대로 겹치면 소음이 된다. 중복만 걸러도 밀도가 잡힌다.
+              - at: pitch 0.95~1.05
+                why: 같은 클립이 반복돼도 미묘하게 다르게 들리도록 피치를 흔든다. 클립을 늘리지 않고 단조로움을 던다.
+          - type: callout
+            badge: 데이터
+            tone: white
+            title: 사운드를 에셋으로 분리한다
+            body: >-
+              `SFXData` 는 ScriptableObject 입니다 — 클립 · 볼륨 · 스킵 오프셋을 에셋으로 빼 두어, 소리를 바꾸는 데
+              코드를 고치지 않습니다. SFX 풀 10개 · BGM 볼륨 0.4.
+  - title: 그래픽 병목 진단과 최적화
+    intro: >-
+      런타임 프레임이 **15FPS 이하**로 떨어져 진행이 불가능한 구간이 있었습니다. 원인을 감으로 찍지 않고
+      프로파일러로 갈라낸 뒤, 씬 특성에 맞는 해법을 골랐습니다.
+    parts:
+      - badge: 진단
+        title: 프로파일러가 가리킨 곳 — `Gfx.WaitForPresent`
+        lede: >-
+          CPU 그래프에서 `Gfx.WaitForPresent` 가 크게 잡혔습니다. **CPU 가 GPU 작업이 끝나기를 기다리는** 구간이므로
+          병목은 CPU 쪽 로직이 아니라 GPU 렌더 부하였습니다. 그래서 스크립트가 아니라 **렌더할 메쉬의 양**을 줄였습니다.
+        blocks:
+          - type: figure-grid
+            cells:
+              - src: ../../assets/vermintide/Before.png
+                caption: '**최적화 전** — 프레임 타임이 !!66ms(15FPS) 선까지!! 치솟는 구간이 연속으로 이어진다'
+                background: '#232323'
+              - src: ../../assets/vermintide/After.png
+                caption: '**최적화 후** — ==16ms(60FPS) 아래로== 평탄해졌다'
+                background: '#232323'
+          - type: metrics
+            items:
+              - label: 프레임 타임 (스파이크 구간)
+                before: 66ms 선까지
+                after: 16ms 아래
+                delta: 4배 단축
+              - label: 프레임레이트
+                before: 15FPS 이하
+                after: 60+FPS
+                delta: 진행 가능
+          - type: points
+            variant: check
+            columns: 2
+            items:
+              - title: Occlusion Culling
+                body: 겹치는 오브젝트가 많은 실내 던전이라, 안 보이는 메쉬를 아예 렌더하지 않게 해 GPU 부하를 덜었다
+              - title: Static 배칭
+                body: 정적 오브젝트의 드로우콜을 묶었다. Occlusion Culling 의 베이크 데이터도 Static 기준으로 생성된다
+          - type: callout
+            badge: 트레이드오프
+            tone: tint
+            body: >-
+              Occlusion Culling 은 공짜가 아닙니다 — **가림 판정용 CPU 연산이 추가로 듭니다.** 개활지처럼 가리는 것이
+              적은 씬이라면 이득이 작습니다. 이 게임은 실내 던전이라 컬링으로 얻는 GPU 이득이 그 비용보다 크다고 보고
+              적용했습니다(→ 고민과 선택 결정 3).
+decisions:
+  - title: 전투 처리 — 직접 호출 vs 이벤트 큐
+    options:
+      - { key: A, title: 공격자가 TakeDamage 직접 호출 }
+      - { key: B, title: CombatEvents 를 큐에 넣고 시스템이 처리, chosen: true }
+    criteria:
+      - label: 결합도
+        values:
+          - 공격자가 피격 대상을 직접 참조 → 서로를 알아야 함
+          - 양쪽 다 `CombatSystem` 만 알면 됨 · 서로 모름
+      - label: 처리 타이밍
+        values:
+          - 접촉 즉시 (지연 0)
+          - 다음 `Update` (1프레임 지연 가능)
+      - label: 프레임 부하 제어
+        values:
+          - 한 프레임에 몰리면 그대로 다 처리
+          - 프레임당 10건 상한으로 나눠 처리
+      - label: 부가 반응 확장
+        values:
+          - 공격 코드가 혈흔·게이지·카운트를 직접 호출
+          - 구독만 하면 역참조 없이 반응
+    reason: >-
+      피격 한 번에 혈흔 · 스킬 게이지 · 웨이브 카운트 같은 반응이 여럿 붙는데, 이걸 공격 코드가 다 직접 호출하면 전투
+      로직이 표현 · UI 코드에 얽힙니다. ==큐 + 이벤트 브로드캐스트== 로 바꾸니 구독자들이 서로를 몰라도 각자 반응했고,
+      처리량 상한으로 폭주 프레임도 나눠 처리할 수 있었습니다. **즉시성(1프레임 지연)을 내주고 결합도와 프레임 안정성을
+      택한** 것입니다.
+  - title: 무기 구조 — Player 직접 참조 vs 전략 패턴
+    options:
+      - { key: A, title: Player 가 무기를 각각 필드로 직접 참조 }
+      - { key: B, title: WeaponBase 추상 타입 하나로 다룸, chosen: true }
+    criteria:
+      - label: 무기 추가 비용
+        values:
+          - 새 무기마다 `Player` 에 필드·분기 추가
+          - 파생 클래스만 추가 · `Player` 무수정
+      - label: 다형성
+        values:
+          - 무기별로 다른 호출부 필요
+          - '`currentWeapon.RMBClick()` 하나로 통일'
+      - label: 무기별 특수행동 (가드)
+        values:
+          - 어차피 `Player` 가 전부 앎
+          - '`is GreatSword` 한 줄로 최소 노출'
+      - label: 애니메이터 교체
+        values:
+          - 무기별 코드 분기
+          - 무기가 든 `RuntimeAnimatorController` 로 일괄 교체
+    reason: >-
+      무기를 늘릴 때마다 `Player` 를 뜯어고치는 게 싫었습니다. `WeaponBase` 로 추상화하니 ==부모 타입에만 의존== 하게 되어
+      새 무기는 클래스 추가로 끝났습니다. 초기 설계에서는 실제로 `Player` 가 구체 무기를 직접 참조하고 있었고,
+      무기가 늘 때마다 플레이어 코드를 고쳐야 하는 문제를 겪은 뒤 전략 패턴으로 리팩터링했습니다.
+  - title: 렌더 최적화 — Occlusion Culling 적용 여부
+    options:
+      - { key: A, title: 미적용 · 컬링 판정 CPU 비용을 아낌 }
+      - { key: B, title: Static 배칭 + Occlusion Culling 적용, chosen: true }
+    criteria:
+      - label: CPU 비용
+        values:
+          - 컬링 판정 연산 없음
+          - 가림 판정 연산이 추가로 듦
+      - label: GPU 렌더 부하
+        values:
+          - 안 보이는 메쉬도 렌더
+          - 비가시 메쉬를 렌더하지 않음
+      - label: 씬 특성 적합도
+        values:
+          - 개활지처럼 가림이 적으면 이득 작음
+          - 겹치는 오브젝트가 많은 실내 던전에 적합
+      - label: 결과
+        values:
+          - 15FPS 병목 유지
+          - 15FPS → 60+FPS
+    reason: >-
+      프로파일러에서 `Gfx.WaitForPresent` 로 !!GPU 병목!! 을 확인했습니다. Occlusion Culling 은 공짜가 아니라
+      **가림 판정용 CPU 연산이 추가로 드는** 트레이드오프였지만, 이 게임은 겹치는 오브젝트가 많은 실내 던전이라 컬링으로
+      얻는 GPU 이득이 CPU 비용보다 크다고 판단해 적용했습니다. 동시에 Static 오브젝트는 드로우콜을 묶고, Occlusion Culling
+      이 참조하는 베이크 데이터도 Static 기준으로 생성되므로 함께 켰습니다. 결과 ==15FPS → 60+FPS==.
+  - title: 점프력 계산 — velocity 직접 지정 vs Sqrt 환산
+    options:
+      - { key: A, title: velocity.y 에 raw 속도값 직접 지정 }
+      - { key: B, title: Mathf.Sqrt 로 미터 단위 jumpHeight 를 속도로 환산, chosen: true }
+    criteria:
+      - label: 연산 비용
+        values:
+          - Sqrt 없음 (가벼움)
+          - 점프 입력마다 `Sqrt` 1회
+      - label: 변수 가독성
+        values:
+          - raw 속도값을 감으로 튜닝
+          - 미터 단위로 "몇 m 점프" 직관적 설정
+      - label: 성능 영향
+        values:
+          - 없음
+          - 입력당 1회뿐이라 사실상 무시 가능
+    reason: >-
+      `Sqrt` 가 무거운 연산인 건 맞습니다. 하지만 점프는 매 프레임이 아니라 **점프 입력이 있을 때 한 번만** 호출되므로
+      성능 영향이 사실상 없다고 판단했습니다. 대신 점프력을 ==미터 단위(`jumpHeight`)== 로 다룰 수 있어 "3m 높이로 점프"
+      같은 직관적 튜닝이 가능해지는 가독성을 택했습니다 — 실제 코드는 `velocity.y = Mathf.Sqrt(jumpHeight * -1f * gravity)`
+      입니다. **연산 비용을 호출 빈도로 나눠서** 본 판단입니다.
+  - title: 중복 타격 필터 — 대상별 bool 플래그 vs 피격 집합
+    options:
+      - { key: A, title: 대상마다 "이미 맞음" bool 을 두고 되돌림 }
+      - { key: B, title: 공격자가 맞힌 대상을 HashSet 에 모으고 스윙마다 Clear, chosen: true }
+    criteria:
+      - label: 상태 위치
+        values:
+          - 대상마다 각자 보유
+          - 공격자 한 곳의 `HashSet` 에 집중
+      - label: 재피격 판정
+        values:
+          - 대상의 bool 확인 (A 가 더 쌈)
+          - '`Contains` O(1)'
+      - label: 초기화 (스윙 종료)
+        values:
+          - 맞은 대상을 따로 기억해야 함 → 사실상 컬렉션 필요
+          - '`OnEnable` 에서 `Clear` 한 번'
+      - label: 책임 소재
+        values:
+          - '"내 스윙에 맞았나" 상태가 대상 쪽에 흩어짐'
+          - '"이번 스윙에 내가 맞힌 대상"을 공격자가 소유'
+    reason: >-
+      판정 자체는 bool 필드 접근이 더 쌉니다. 문제는 **초기화**였습니다 — 대상별 bool 은 스윙이 끝날 때 플래그를 되돌려야
+      하는데, 그러려면 어떤 대상을 맞혔는지 따로 기억해야 해서 결국 컬렉션이 필요해집니다(아니면 전체 대상을 순회해 초기화).
+      ==HashSet== 은 "이번 스윙에 내가 맞힌 대상"을 공격자가 한 곳에 들고 있다가 콜라이더가 켜지는 `OnEnable` 에서 `Clear`
+      한 번으로 리셋되므로 상태의 소유와 초기화가 깔끔합니다. **판정 비용을 조금 내주고 상태 관리·초기화의 단순함을 택한 것**입니다.
+retrospective:
+  results:
+    - 런타임 프레임 **15FPS → 60+FPS** — Static 배칭 + ==Occlusion Culling== 으로 GPU 병목 해소
+  satisfaction:
+    - title: 확장에 강한 구조
+      body: >-
+        무기(전략) · 몬스터(상속) · 보스 상태(상태 패턴) 세 축 모두 "종류를 늘려도 호출부는 그대로"를 목표로,
+        기존 코드 수정 없이 클래스 추가만으로 확장되게 짰습니다.
+    - title: 표현과 로직의 분리
+      body: >-
+        혈흔 · 스킬 게이지 · 웨이브 카운트가 `CombatSystem.Events` 를 구독해 역참조 없이 반응합니다.
+        전투 코드가 이펙트 · UI 를 몰라도 되도록 옵저버로 디커플링했습니다.
+    - title: 인터페이스 계약으로 타입 통일
+      body: >-
+        `IFighter` · `IInteractable` · `IObjectPoolItem` 로 구체 타입을 몰라도 같은 타입으로 다룹니다.
+        물리는 `Collider` 만 주므로 `Dictionary<Collider, IFighter>` 로 전투 주체를 O(1) 역매핑했습니다.
+  learnings:
+    - title: 껐다 켜지는 객체에 지속 상태를 두지 말 것
+      cells:
+        - label: 무엇을
+          body: 무기 스크립트가 자기 쿨타임 · 스태미나 · 스킬 게이지를 직접 관리하게 짰다.
+        - label: 문제
+          body: >-
+            무기를 교체하면 이전 무기가 `SetActive(false)` 되면서 그 `Update` 가 멈춰 !!쿨타임 타이머가 얼어붙는!!
+            버그가 났다. 비활성 GameObject 는 `Update` 가 돌지 않는다는 걸 이때 배웠다.
+        - label: 알게된 점
+          body: >-
+            ==쿨타임 · 스태미나 · 스킬 게이지를 항상 켜져 있는 별도 클래스(`WeaponCool`)로 분리== 해 해결했다.
+            껐다 켜지는 객체에 지속 상태를 두지 말자는 교훈.
+      tint: true
+    - title: 상속의 진짜 의미
+      body: >-
+        상속을 코드 중복 제거 도구로만 봤는데, **다형성으로 결합도를 낮추고 시스템을 유연하게 만드는 것**임을
+        무기 · 몬스터 구조를 짜며 체감했습니다.
+    - title: 정답보다는 선택과 집중
+      body: >-
+        오브젝트 풀에 `Queue` 를 쓰며 중간 데이터 접근을 포기하는 대신 입출력 속도를 얻었고, `Instantiate` 부하를
+        게임 시작으로 몰아 런타임 프레임 드랍을 막았습니다. 최적화는 단순한 과부하 제거가 아니라 **지금 시스템의 목표를
+        위해 무엇을 포기할지 고르는 과정**임을 배웠습니다.
+  improvements:
+    - title: 몬스터 등록 해제 자동화
+      body: >-
+        `CombatSystem` 이 `Dictionary<Collider, IFighter>` 로 콜라이더→전투주체를 역매핑하는데, 몬스터가 `Destroy` 되면
+        그 참조가 딕셔너리에 남는 !!dangling reference!! 문제가 있습니다. 지금은 오브젝트 풀을 써서 `Destroy` 될 일이 없어
+        드러나지 않았을 뿐입니다. 다음엔 등록 해제를 몬스터 수명주기(`OnDisable`/`OnDestroy`)에 묶어 **호출을 빠뜨릴 수 없게
+        자동화**하고 싶습니다.
