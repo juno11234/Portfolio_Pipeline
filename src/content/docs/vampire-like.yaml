@@ -230,7 +230,6 @@ features:
                 why: 데이터 로드가 끝나야 플레이어 스탯을 세팅할 수 있어 순서를 강제한다.
               - at: PlayerWarriorId
                 why: 플레이어 직업 ID(3001)가 상수로 하드코딩돼 있다. 현재 전사만 쓰고 JobType.Mage는 진입 경로가 없다.
-           
   - title: 데이터 파이프라인 — TSV 임포트 · DataManager
     parts:
       -
@@ -292,7 +291,6 @@ features:
               - - 5001~
                 - StatLevelUp
                 - id · name · increaseStatPer · minLevel · maxLevel · statType
-        
   - title: 이벤트 큐 전투 시스템
     parts:
       -
@@ -330,7 +328,6 @@ features:
                   D -->|Heal| H["Receiver.Heal(e)"]
                   C --> R["수신자 · Player · Enemy"]
                   H --> R
-    
   - title: 플레이어 & 적 — IFighter
     parts:
       -
@@ -368,7 +365,6 @@ features:
               - ["1003", Ghost, "75", "20", "7", Melee]
               - ["1004", Warlock, "50", "20", "5", Ranged]
               - ["1005", Cyclops, "300", "30", "5", Boss]
-         
   - title: 스킬 시스템 — SkillBase 계층
     parts:
       -
@@ -433,7 +429,6 @@ features:
                   H -->|없음| I["InstantiateAsync(prefabKey)"]
                   I --> N["Init(...)"]
                   N --> A["_activeWeapons.Add"]
-         
   - title: 스폰 & 오브젝트 풀
     parts:
       -
@@ -512,7 +507,6 @@ features:
               - ["2 → 3", 100 × 2 × 1.5 = 300]
               - ["3 → 4", 100 × 3 × 1.5 = 450]
               - ["4 → 5", 100 × 4 × 1.5 = 600]
-       
   - title: UI 시스템
     parts:
       -
@@ -544,7 +538,6 @@ features:
               - { label: 클릭 · OnSkillSelected, arrow: → }
               - { label: 패널 닫기 · timeScale=1, arrow: → }
               - { label: AddOrLevelUpWeaponAsync }
-         
   - title: GC 스파이크 제거 기법
     parts:
       -
@@ -682,8 +675,8 @@ retrospective:
   satisfaction:
     - title: 예상을 뛰어넘은 GC 감소
       body: >-
-        예상보다 훨씬 많은 양의 GC가 감소했다. 프레임당 GC 할당 **196회 → 4회 (97%↓)** ·
-        Materials **824개 → 249개 (70%↓)** · 메모리 **140MB** 절감.
+        예상보다 훨씬 많은 양의 GC가 감소했습니다. 프레임당 GC 할당 **196회 → 4회 (97%↓)** ·
+        Materials **824개 → 249개 (70%↓)** · 메모리 **140MB** 절감했습니다.
   # 내용이 길어 3열 카드에서 눌린다 → cells(3칸)로 채워 전폭 세로 LessonCard 로 렌더.
   # 디자인의 원형 그대로다(원본: `① 평균이 아니라 스파이크를…` tint · `② 텍스처 압축…`).
   learnings:
@@ -708,12 +701,12 @@ retrospective:
   # 실제 개선 5건을 이어왔다. ①의 '→ 양식 ②' 개선 후보와 일치한다. ②를 채우면 그걸로 교체.
   improvements:
     - title: 스킬 아이콘 주소 데이터화
-      body: 스킬 아이콘 주소를 switch에서 SkillData(TSV)로 옮겨, 스킬 추가 시 코드를 건드리지 않게 한다.
+      body: 스킬 아이콘 주소를 switch에서 SkillData(TSV)로 옮겨, 스킬 추가 시 코드를 건드리지 않게 할 계획입니다.
     - title: 쿨타임 단일 소스화
-      body: 쿨타임 감소량(0.5f)을 SkillData로 옮겨 표시와 실제가 한 소스를 보게 한다.
+      body: 쿨타임 감소량(0.5f)을 SkillData로 옮겨 표시와 실제가 한 소스를 보게 할 계획입니다.
     - title: StatLevelUp 살리기 또는 제거
-      body: StatLevelUp에 조회 API를 붙여 기능을 살리거나, 살릴 계획이 없다면 데이터와 열거형을 걷어낸다.
+      body: StatLevelUp에 조회 API를 붙여 기능을 살리거나, 살릴 계획이 없다면 데이터와 열거형을 걷어낼 계획입니다.
     - title: 구독 해제 보완
-      body: UIManager.OnDestroy에서 PlayerController의 OnHpChanged·OnDeath 구독도 해제한다.
+      body: UIManager.OnDestroy에서 PlayerController의 OnHpChanged·OnDeath 구독도 해제할 계획입니다.
     - title: 직업 선택 경로 개방
-      body: GameInitializer.PlayerWarriorId 하드코딩을 걷어내고 GetSkillList()의 Warrior 고정 필터를 파라미터화해 직업 선택 경로를 연다.
+      body: GameInitializer.PlayerWarriorId 하드코딩을 걷어내고 GetSkillList()의 Warrior 고정 필터를 파라미터화해 직업 선택 경로를 열 계획입니다.
