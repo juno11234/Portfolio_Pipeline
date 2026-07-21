@@ -230,13 +230,7 @@ features:
                 why: 데이터 로드가 끝나야 플레이어 스탯을 세팅할 수 있어 순서를 강제한다.
               - at: PlayerWarriorId
                 why: 플레이어 직업 ID(3001)가 상수로 하드코딩돼 있다. 현재 전사만 쓰고 JobType.Mage는 진입 경로가 없다.
-          - type: callout
-            badge: 주의
-            tone: tint
-            title: timeScale=0 이면 딜레이도 함께 멈춘다
-            body: >-
-              이 프로젝트의 모든 `UniTask.Delay`는 `ignoreTimeScale` 기본값(false)입니다. 레벨업 · 게임오버로
-              `Time.timeScale = 0`이 되면 스폰 간격 · 연사 딜레이 · 피격 무적 대기도 함께 멈춥니다. (의도된 동작)
+           
   - title: 데이터 파이프라인 — TSV 임포트 · DataManager
     parts:
       -
@@ -255,11 +249,11 @@ features:
             items:
               - title: DataImporter (에디터)
                 body: >-
-                  VamSir Tools ▸ Data Importer 메뉴의 EditorWindow. 탭 분리 파싱, 2줄 헤더(타입 행 · 한글명 행)라
+                  Tools ▸ Data Importer 메뉴의 EditorWindow. 탭 분리 파싱, 2줄 헤더(타입 행 · 한글명 행)라
                   루프가 i=2부터 시작. delayCall로 GUI 충돌 회피, Undo.RecordObject + SetDirty. 플레이어(6칸) · 스킬(12칸)은 칸 수 검증.
               - title: DataManager (런타임)
                 body: >-
-                  Addressables.LoadAssetAsync로 GameDataContainer를 로드한 뒤 List를 3종 Dictionary로 재가공.
+                  Addressables로 데이터 컨테이너를 로드한 뒤 List를 3종 Dictionary로 재가공.
                   IDisposable로 스코프 종료 시 Release.
           - type: code
             api: DataManager.cs · GetSkillList()
@@ -298,12 +292,7 @@ features:
               - - 5001~
                 - StatLevelUp
                 - id · name · increaseStatPer · minLevel · maxLevel · statType
-          - type: callout
-            badge: 사실
-            tone: white
-            body: >-
-              스킬 TSV의 6번 인덱스(최소 레벨)는 코드에서 읽지 않고 건너뜁니다. `AssetDatabase.SaveAssets()`는
-              주석 처리돼 있어, `SetDirty` 후 수동/자동 저장이 있어야 디스크에 반영됩니다.
+        
   - title: 이벤트 큐 전투 시스템
     parts:
       -
@@ -341,12 +330,7 @@ features:
                   D -->|Heal| H["Receiver.Heal(e)"]
                   C --> R["수신자 · Player · Enemy"]
                   H --> R
-          - type: callout
-            badge: 사실
-            tone: white
-            body: >-
-              몬스터 등록 · 해제는 풀의 `createFunc`(RegisterMonster) · `actionOnDestroy`(RemoveMonster)에 걸립니다.
-              `Max_Event_Count`(1000) 상수와 주입된 `_dataManager` · `EventCallback`은 현재 사용처 · 구독자가 없습니다.
+    
   - title: 플레이어 & 적 — IFighter
     parts:
       -
@@ -384,12 +368,7 @@ features:
               - ["1003", Ghost, "75", "20", "7", Melee]
               - ["1004", Warlock, "50", "20", "5", Ranged]
               - ["1005", Cyclops, "300", "30", "5", Boss]
-          - type: callout
-            badge: 사실
-            tone: white
-            body: >-
-              `EnemyStat.attackType`(Ranged · Boss)이 데이터엔 있으나 EnemyController가 분기에 쓰지 않아
-              현재 모든 적이 근접 행동만 합니다. `EnemyController.Heal()`은 빈 구현입니다.
+         
   - title: 스킬 시스템 — SkillBase 계층
     parts:
       -
@@ -454,12 +433,7 @@ features:
                   H -->|없음| I["InstantiateAsync(prefabKey)"]
                   I --> N["Init(...)"]
                   N --> A["_activeWeapons.Add"]
-          - type: callout
-            badge: 사실
-            tone: white
-            body: >-
-              Mage 스킬 4종(4005~4008: ReleaseMagic · FireBall · LightningChain · IceMagic)은 TSV엔 있으나
-              `JobType.Mage` 진입 경로가 없어 미사용입니다.
+         
   - title: 스폰 & 오브젝트 풀
     parts:
       -
@@ -538,12 +512,7 @@ features:
               - ["2 → 3", 100 × 2 × 1.5 = 300]
               - ["3 → 4", 100 × 3 × 1.5 = 450]
               - ["4 → 5", 100 × 4 × 1.5 = 600]
-          - type: callout
-            badge: 사실
-            tone: white
-            body: >-
-              `ExpItem`은 SetTarget 전까지 제자리에 있다가, 지정되면 MoveTowards(속도 15)로 비행해 거리²<0.25면
-              수집 콜백을 부릅니다. 보석 풀은 50/300, 50개 프리웜, 모두 런타임 생성 ExpContainer의 자식입니다.
+       
   - title: UI 시스템
     parts:
       -
@@ -575,12 +544,7 @@ features:
               - { label: 클릭 · OnSkillSelected, arrow: → }
               - { label: 패널 닫기 · timeScale=1, arrow: → }
               - { label: AddOrLevelUpWeaponAsync }
-          - type: callout
-            badge: 사실
-            tone: white
-            body: >-
-              `UIManager.OnDestroy`는 ExpManager 이벤트는 해제하나 PlayerController의 OnHpChanged · OnDeath 구독은
-              해제하지 않습니다. 최대 레벨 스킬도 후보에서 제외되지 않으나 선택 시 maxLevel 가드로 변화 없이 반환됩니다.
+         
   - title: GC 스파이크 제거 기법
     parts:
       -
@@ -714,15 +678,12 @@ decisions:
 # ── ⑤ 결과 · 회고 (② 사람이 쓴 판단) ──────────────────────────────────────
 retrospective:
   # 만족·깨달음·개선의 가로↔세로는 렌더러가 본문 길이로 자동 결정한다(src/lib/cardLayout.ts).
-  results:
-    - 프레임당 GC 할당 **196회 → 4회 (97%↓)**
-    - Materials **824개 → 249개 (70%↓)**
-    - 메모리 **140MB** 절감
+
   satisfaction:
     - title: 예상을 뛰어넘은 GC 감소
       body: >-
-        예상보다 훨씬 많은 양의 GC가 감소했다. 작은 프로젝트도 이 정도로 줄었으니, 프로젝트 규모가 커지면
-        그 효과도 더 커질 것으로 기대된다.
+        예상보다 훨씬 많은 양의 GC가 감소했다. 프레임당 GC 할당 **196회 → 4회 (97%↓)** ·
+        Materials **824개 → 249개 (70%↓)** · 메모리 **140MB** 절감.
   # 내용이 길어 3열 카드에서 눌린다 → cells(3칸)로 채워 전폭 세로 LessonCard 로 렌더.
   # 디자인의 원형 그대로다(원본: `① 평균이 아니라 스파이크를…` tint · `② 텍스처 압축…`).
   learnings:
