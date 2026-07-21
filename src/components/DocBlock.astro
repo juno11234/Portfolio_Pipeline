@@ -205,8 +205,13 @@ const cardItems = b.type === 'points' ? b.items : [];
    * 픽셀을 박은 그림(원본이 칸보다 작을 때)을 칸 **가운데**로 놓는다.
    * dc 의 FigureGrid 는 byte-0 라 그 style 문자열을 안 건드리고 어댑터에서 준다 — 칩 tone 때와 같은 규칙.
    * 폭 100% 인 그림에는 아무 영향이 없다(남는 폭이 0이라 auto 가 0).
+   *
+   * height 를 비율에 맡기는 것이 요점이다. global.css 의 `img { max-width:100% }` 는 창이 좁아지면
+   * **폭만** 줄이는데 인라인 `height:280px` 가 남아 그림이 !!가로로 찌그러진다!!(라이브에서 잡았다).
+   * 인라인 style 을 이기려면 !important 가 필요하다 — dc 를 못 고치니 여기서 덮는다.
+   * 넓은 화면에선 폭이 그대로라 높이도 그대로 계산된다(390×280 → 280). 좁아질 때만 비율대로 함께 준다.
    */
-  .figgrid :global(figure img) { margin-inline: auto; }
+  .figgrid :global(figure img) { margin-inline: auto; height: auto !important; }
 
   .prose { display: grid; gap: 12px; margin: 4px 0; }
   .prose p { font-size: 14.5px; line-height: 1.75; color: var(--ink-soft); }
