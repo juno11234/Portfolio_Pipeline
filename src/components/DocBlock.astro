@@ -157,7 +157,7 @@ const cardItems = b.type === 'points' ? b.items : [];
 )}
 
 {b.type === 'figure-grid' && (
-  <div class="scroll"><FigureGrid
+  <div class="scroll figgrid"><FigureGrid
     margin="16px 0 6px"
     cells={b.cells.map((c: any) => ({
       src: c.src.src,
@@ -200,6 +200,13 @@ const cardItems = b.type === 'points' ? b.items : [];
 
 <style>
   .scroll { overflow-x: auto; }
+
+  /*
+   * 픽셀을 박은 그림(원본이 칸보다 작을 때)을 칸 **가운데**로 놓는다.
+   * dc 의 FigureGrid 는 byte-0 라 그 style 문자열을 안 건드리고 어댑터에서 준다 — 칩 tone 때와 같은 규칙.
+   * 폭 100% 인 그림에는 아무 영향이 없다(남는 폭이 0이라 auto 가 0).
+   */
+  .figgrid :global(figure img) { margin-inline: auto; }
 
   .prose { display: grid; gap: 12px; margin: 4px 0; }
   .prose p { font-size: 14.5px; line-height: 1.75; color: var(--ink-soft); }
