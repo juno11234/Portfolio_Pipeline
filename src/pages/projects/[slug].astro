@@ -24,7 +24,6 @@ import Figure from '../../components/dc/Figure.astro';
 import WhatWhy from '../../components/dc/WhatWhy.astro';
 import OverviewLede from '../../components/dc/OverviewLede.astro';
 import GoalCards from '../../components/dc/GoalCards.astro';
-import Tldr from '../../components/dc/Tldr.astro';
 import Decision from '../../components/dc/Decision.astro';
 import StackTable from '../../components/dc/StackTable.astro';
 import PrincipleCards from '../../components/dc/PrincipleCards.astro';
@@ -107,7 +106,12 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
         <WhatWhy what={d.overview.what} why={d.overview.why} />
       )}
       {d.overview.goals !== undefined && <GoalCards goals={d.overview.goals} />}
-      <Tldr label="▶ 10초 요약 — 이 문서가 증명하는 것" body={d.overview.evidence} />
+      {/*
+        '▶ 10초 요약' 상자(Tldr, overview.evidence)는 사용자 결정으로 개요에서 뺐다(2026-07-22).
+        스키마의 `evidence` 는 필수 게이트로 그대로 두고 YAML 본문도 남겼다 — 렌더만 지운 것이다.
+        되살리려면 dc/Tldr.astro 를 다시 import 해 여기에
+        <Tldr label="▶ 10초 요약 — 이 문서가 증명하는 것" body={d.overview.evidence} /> 를 놓는다.
+      */}
       {d.overview.scope !== undefined && (
         <div class="scopebox">
           <p class="scope-label">범위</p>
