@@ -17,16 +17,12 @@
 #   ⑤ retrospective   결과·회고    만족 · 깨달음 · 개선
 subtitle: 3인칭 소울라이크 액션
 overview:
-  lead: >-
-    **스태미나를 소모하는 회피·공격**과 **화톳불 세이브**, 2페이즈 보스를 갖춘 3인칭 소울라이크 액션 게임입니다.
-    1인 개발로 **FSM 플레이어 · Behaviour Tree 몬스터 AI · 이벤트 기반 MVVM · Jenkins CI**까지
-    61개 스크립트(약 5,527줄)를 직접 설계·구현했습니다.
+
   what: >-
-    플레이어는 **유한 상태 머신(FSM)**으로, 몬스터는 **행동 트리(BT)**로 움직입니다.
-    전투·피격·UI 갱신은 모두 **이벤트와 Observable**로 흐르는 단방향 구조입니다.
+    **스태미나를 소모하는 회피·공격**과, 2페이즈 보스를 갖춘 **3인칭 액션** 소울라이크입니다.
   why: >-
-    상태가 늘수록 전이 조건이 폭발하는 FSM의 한계를 **항상 트리 구조인 BT**로 풀고,
-    잦은 UI 변경에는 **낮은 결합의 MVVM**으로 대응하는 것이 이 프로젝트의 승부처입니다.
+    상태가 늘수록 전이 조건이 폭발하는 FSM의 한계를 **트리 구조인 BT**로 풀고,
+    다양한 곳에서 참조해야 하는 UI를 위해 **구독만으로 확장 가능한 MVVM**으로 대응하는 것이 핵심 목표입니다.
   evidence: >-
     문제 제기는 프로파일러 수치가 아니라 **구조가 부족할 때 결정적으로 재현되는 버그**입니다.
     적이 콤보 도중 플레이어가 사거리를 벗어나면 매 프레임 트리를 재탐색하는 BT 특성상 진행 중이던
@@ -52,8 +48,8 @@ overview:
         tech: uGUI · TextMeshPro
         purpose: HP·스태미나 바, 월드 HP 바 빌보드, 인벤토리 드래그 앤 드롭
       - category: 데이터
-        tech: ScriptableObject · TSV
-        purpose: 리플렉션 제네릭 파서로 기획 데이터를 코드와 분리
+        tech: ScriptableObject
+        purpose: 공격, 스탯, 무기 데이터를 에셋화
       - category: 빌드 자동화
         tech: Jenkins
         purpose: 1시간 주기 폴링 → 배치 모드 빌드 → exit 코드 판정
@@ -200,7 +196,6 @@ architecture:
       title: 런타임 부팅 순서 — Awake → Start → Update
       lede: >-
         `CombatSystem.Instance`는 `Awake`에서 할당되고 `FighterView.Start`에서 등록·사용됩니다.
-        즉 **싱글턴 할당이 등록보다 반드시 먼저** 일어나야 하는 초기화 체인입니다.
       blocks:
         - type: points
           variant: numbered
@@ -307,8 +302,8 @@ features:
             badge: 무적
             tone: white
             body: >-
-              `RollState.Enter()`가 `ActiveInvisible(true)`로 `FighterView.Invincible`을 켭니다.
-              `TakeDamage`는 `Invincible`이면 즉시 `return`하므로 구르기 동안 피해가 무효화되고,
+              `RollState.Enter()`가 플레이어 무적을 켭니다.
+              `TakeDamage`는 무적이면 즉시 `return`하므로 구르기 동안 피해가 무효화되고,
               Enter/Exit 대칭이라 **상태를 벗어나면 반드시 무적이 풀립니다**.
       - badge: 콤보
         title: 3타 콤보 — 애니 90% 지점 판정
@@ -321,12 +316,6 @@ features:
               - { label: Attack2, tone: current, arrow: → }
               - { label: Attack3, tone: current, arrow: → }
               - { label: WalkState }
-          - type: callout
-            badge: 미묘
-            tone: white
-            body: >-
-              `ThirdAttackReady`는 `_animationPlayed == true`일 때만 플래그를 세웁니다. 즉
-              **2타 모션이 시작된 이후의 클릭만** 3타로 이어집니다 — 1타 도중 연타는 3타를 예약하지 않습니다.
       - badge: 스태미나
         title: 소모 · 회복 · 탈진 락
         blocks:
@@ -343,7 +332,7 @@ features:
             body: >-
               `StaminaChange()`는 값을 **가산**합니다. 따라서 인스펙터의 `rollStamina` · `attackStamina`는
               **반드시 음수**여야 소모로 동작합니다. 질주만 `-20f * Time.deltaTime`로 지속 소모하고,
-              리젠은 `WalkState`에서만 일어납니다. 탈진 락은 `_noStamina`가 `staminaRegenRateTime` 경과 후
+              리젠은 `WalkState`에서만 일어납니다. 탈진 락은 스태미나가 일정시간 경과 후
               풀리는, 소울라이크 특유의 페널티입니다.
   - title: 전투 · MVVM
     intro: >-
@@ -416,14 +405,8 @@ features:
                   }
                   InGameEvent <|-- CombatEvent
                   InGameEvent <|-- HealthEvent
-          - type: callout
-            badge: 예약
-            tone: white
-            body: >-
-              `Damage` · `HealAmount`는 **`int`**입니다. `HitPosition` · `Collider`는 히트 이펙트·데칼 스폰을
-              위한 **예약 필드**로, 현재 소비처는 없습니다.
       - badge: MVVM
-        title: Observable<T> — 잦은 UI 변경을 낮은 결합으로
+        title: Observable<T> — 책임 분리로 낮은 결합
         blocks:
           - type: table
             headers: [계층, 클래스, 책임, Unity 의존]
@@ -461,10 +444,9 @@ features:
               - at: Subscribe 즉시 Invoke
                 why: 구독하는 순간 현재값을 1회 전달해 초기화 코드를 없앤다 — 뷰가 최신 값으로 바로 동기화된다. 폴링이 사라진다.
       - badge: 판정
-        title: 애니메이션 주도 히트박스
+        title: StateMachineBehaviour 콜라이더 활성화
         lede: >-
-          히트박스 활성 타이밍을 코드 타이머가 아니라 **애니메이션 클립 자체**가 소유합니다.
-          `AttackTiming`(StateMachineBehaviour)이 정규화 시간에 `IAttackAble`을 호출하고, 한 번의 휘두름에서
+          히트박스 활성 타이밍은 StateMachineBehaviour가 정규화 시간에 `IAttackAble`을 호출해 잡고, 한 번의 휘두름에서
           같은 대상을 두 번 때리지 않도록 `HashSet<FighterView>`로 막습니다.
         blocks:
           - type: chips
@@ -480,19 +462,10 @@ features:
               - ['플레이어', 'stat.Damage + str×StrengthBonus()/2 + dex×DexterityBonus()/2']
               - ['일반 몬스터', 'attackData[0].damage (고정)']
               - ['보스 스킬', 'attackData.damage (프리팹별 SO)']
-          - type: callout
-            badge: 관찰
-            tone: white
-            body: >-
-              `GetFighter()`는 `fightersDict[coll]` 인덱서를 그대로 씁니다. 미등록 콜라이더가 들어오면 `null`이
-              아니라 !!KeyNotFoundException!!이 발생 — 호출부의 `if (player != null)`는 도달하지 못하는 방어
-              코드입니다. ==TryGetValue로 바꾸면 계약이 일치==합니다. 실사용에선 적/플레이어가 `Start`에서
-              등록되고 레이어 마스크로 걸러 문제되지 않습니다.
   - title: 적 AI · 행동 트리
     intro: >-
       상태가 늘수록 전이 조건이 폭발하는 상태 패턴 대신, **항상 트리 구조를 유지하는 행동 트리**를 재귀
-      `Evaluate()`로 구현했습니다. 플레이어는 FSM, 몬스터는 BT를 쓰는 **의도적 비대칭**입니다 —
-      몬스터는 "상황 판단 + 확률적 행동 선택"이 필요하기 때문입니다.
+      `Evaluate()`로 구현했습니다.
     parts:
       - badge: 노드 체계
         title: BtNode — 조합 4종 · 리프 10종
@@ -590,10 +563,11 @@ features:
               - at: Success → continue
                 why: 성공한 자식은 건너뛰고 다음 자식으로 넘어간다. 전부 성공해야 시퀀스가 Success다.
           - type: callout
-            badge: 부수효과
+            badge: 같은 버그
             tone: white
             body: >-
-              **걷기 애니 버그**도 같은 계열입니다 — 정지 상태에서 `Vertical`이 1로 남아 걷기 모션이 재생됐습니다.
+              노드에서 애니메이션 파라미터가 초기화되기 전에 끊겨 걷기 모션이 재생됐습니다.
+              하지만 이번에는 우선순위를 결정하는 Selector 특성상 기억력을 만들어줄 수 없었습니다.
               애니 파라미터·NavMeshAgent를 0으로 되돌리고 항상 Success를 반환하는 ==Leaf_Cleaner==를
               시퀀스 중간에 삽입해 상태를 정리했습니다.
       - badge: 카탈로그
@@ -626,14 +600,6 @@ features:
                   D --> D1["CheckRange → Cleaner → comboOrStrafe · Selector_Random"]
                   D1 --> D2["3타 콤보 · 2타 콤보 · Strafe · BackMove→Wait"]
                   E --> E1["walkCheck→Chase→Wait · Strafe"]
-          - type: callout
-            badge: 래치
-            tone: tint
-            body: >-
-              스켈레톤은 `Leaf_WatchPlayer`로 발견을 판정하고, 한 번 발견하면 `findPlayer` 래치가 유지돼
-              **시야에서 벗어나도 어그로가 풀리지 않습니다**. 해제는 화톳불 `Respawn()`에서만 —
-              "발각되면 끝까지 쫓아온다"는 소울라이크 특성과 일치합니다. 보스는 `BossWall`로 입장을 통제하므로
-              이 판정 자체가 없습니다.
   - title: 보스 · 카메라 · 월드
     intro: >-
       보스는 체력 절반에서 **2페이즈**로 전환되고, 카메라·락온은 **LateUpdate 순서**로 배치되며,
@@ -660,8 +626,7 @@ features:
             tone: white
             body: >-
               `skillCool`은 애니메이션 완료가 아니라 **조건 검사 통과 즉시** true가 됩니다. 즉 15초 쿨다운에
-              시전 시간이 포함되어, 실제 재사용 간격은 `15초 − (선딜+타격+후딜)`입니다. `OnSecondPhase`는
-              절반 이하 모든 피격마다 반복 발행되지만 수신 측이 멱등해 문제되지 않습니다.
+              시전 시간이 포함되어, 실제 재사용 간격은 `15초 − (선딜+타격+후딜)`입니다.
       - badge: 카메라
         title: 락온 — LateUpdate 순서가 중요하다
         lede: >-
@@ -710,44 +675,12 @@ features:
               - { label: 입장 컷신 · R 키, arrow: → }
               - { label: 보스전 · 벽 재봉인, tone: dead, arrow: → }
               - { label: 클리어 · 벽 파괴 + 화톳불, tone: current }
-  - title: 데이터 · 빌드
+  # TSV 파이프라인(리플렉션 제네릭 파서 · DatabaseBase 로드 버튼)은 테스트만 하고 실제로 쓰지 않아
+  # 2026-07-22 사용자 결정으로 걷어냈다. 기술 스택의 '데이터' 행도 ScriptableObject 만 남았다.
+  - title: 빌드 자동화
     intro: >-
-      기획 데이터는 **리플렉션 제네릭 파서**로 코드와 분리하고,
       빌드는 **Jenkins**가 폴링부터 exit 코드까지 자동화합니다.
     parts:
-      - badge: 데이터
-        title: TSV 파이프라인 — 리플렉션 제네릭 파서
-        blocks:
-          - type: chips
-            variant: state
-            items:
-              - { label: TSV .txt (에디터 타임), arrow: → }
-              - { label: DatabaseBase · SO, arrow: → }
-              - { label: 'TSVImporter.Parse<T> (버튼 클릭)', tone: current, arrow: ⇒ }
-              - { label: 'List<T> · SetDirty (저장)', tone: current }
-          - type: code
-            api: TSVImporter.cs · Parse<T>()
-            code: |-
-              string[] headers = lines[0].Split('\t');
-              for (int j = 0; j < headers.Length; j++)
-              {
-                  // 헤더 이름 == 필드 이름이면 자동 매핑
-                  FieldInfo field = typeof(T).GetField(headers[j].Trim(),
-                                        BindingFlags.Public | BindingFlags.Instance);
-                  if (field != null)
-                      field.SetValue(entry, ConvertType(values[j].Trim(), field.FieldType));
-              }
-            notes:
-              - at: GetField(header)
-                why: 컬럼↔필드를 이름으로 매칭하므로 열 순서가 무관하고 없는 열은 조용히 무시된다. 스키마가 바뀌어도 파서 코드는 그대로다.
-              - at: ConvertType
-                why: int/float/bool/enum/string을 필드 타입에 맞춰 변환한다. 파싱 예외는 필드 단위로 격리돼 한 셀이 잘못돼도 나머지는 살아남는다.
-          - type: callout
-            badge: 확장
-            tone: tint
-            body: >-
-              `[CustomEditor(typeof(DatabaseBase), true)]`의 **true 인자** 덕분에 `DatabaseBase`를 상속한
-              **모든 자식 SO가 자동으로 로드 버튼**을 갖습니다. 새 DB 타입을 추가해도 에디터 코드를 건드릴 필요가 없습니다.
       - badge: 빌드
         title: Jenkins CI — 폴링에서 exit 코드까지
         blocks:
@@ -913,10 +846,7 @@ decisions:
       분리**해 모듈화·재사용성을 살렸습니다. 중단되면 안 되는 연속 행동은 `Sequence_Memory`, 순수 조건 검사만
       필요한 곳은 기존 `Sequence`로 역할을 나눴습니다.
 retrospective:
-  results:
-    - '!!콤보 끊김!! → 콤보 끝까지 유지 (`Sequence_Memory`)'
-    - '!!걷기 모션 잔류!! → 정지 시 즉시 정지 (`Leaf_Cleaner`)'
-    - 보스 2페이즈(스킬 분기 개방 + 파티클)를 이벤트 하나로 연동
+
   satisfaction:
     - title: 긴장감 있는 AI
       body: >-
@@ -932,7 +862,7 @@ retrospective:
         - label: 같은 원인
           body: 두 버그 모두 **Running이던 자식을 정리할 방법이 없다**는 동일한 근본 원인이었다.
         - label: 알게된 점
-          body: 하나의 근본 해법(**상위 조건이 바뀌면 하위 노드를 정리** = conditional abort)이 있다는 걸 두 번째에서야 알아챘다.
+          body: 하나의 근본 해법(**상위 조건이 바뀌면 하위 노드를 정리** = conditional abort)이 있다는 걸 프로젝트가 끝나고 알아챘다.
       tint: true
     - title: 시각화의 가치
       body: >-
