@@ -1,19 +1,19 @@
 # 키가 그대로 주소가 된다. bond -> /projects/bond
 # 여기 있는 건 사이드바 내비게이션에 필요한 정보뿐이다. 상세 내용은 나중에 별도 파일로 붙인다.
 
-vampire-like:
-  order: 1
-  title: 뱀서라이크
-  genre: 탑뷰 핵 앤 슬래시
-  featured: true
-
 bond:
-  order: 2
+  order: 1
   # 포트폴리오 PDF에는 '4인 팀프로젝트'로 되어 있으나, 자기소개서에 "Bond의 핵심 재미 루프는…"
   # 이라고 쓰여 있어 실제 이름을 썼다. 나머지 5개는 전부 이름이 있어 목록에서 균형이 맞는다.
   title: Bond
   genre: 로그라이크 턴제 RPG
   team: 4인 팀
+  featured: true
+
+vampire-like:
+  order: 2
+  title: 뱀서라이크
+  genre: 탑뷰 핵 앤 슬래시
   featured: true
 
 soulslike:
