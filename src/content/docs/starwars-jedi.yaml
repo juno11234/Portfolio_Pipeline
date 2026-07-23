@@ -412,14 +412,21 @@ features:
             notes:
               - at: Random.Range(0, 2)
                 why: 쿨(skillCool 15s)이 찰 때마다 돌진/충격파 두 스킬 중 하나를 뽑아 패턴을 예측 불가능하게 만든다.
+          # 두 보스컷 비율이 달라(충격파 557×490 가로형 · 돌진 431×501 세로형) 칸을 100%로 채우면 짧은
+          # 충격파 밑에 빈 배경(#232323)이 남는다. 총 높이(이미지+캡션)를 맞춰 픽셀 고정한다 — 캡션이 충격파 2줄·
+          # 돌진 3줄(14px 차)이라 이미지 높이로 그만큼 상쇄해 두 칸 총 높이를 일치시킨다(CLAUDE.md figure-grid 규칙).
           - type: figure-grid
             cells:
               - src: ../../assets/starwars/starwars-boss-pulse.png
                 caption: '**충격파**(PulseAttack) — 장판형 충격파로 주변을 타격'
                 background: '#232323'
+                width: 420
+                height: 370
               - src: ../../assets/starwars/starwars-boss-dash.png
                 caption: '**돌진**(DashAttack) — 붉은 예고 범위 후 직선 돌진, 벽에 부딪히면 그로기'
                 background: '#232323'
+                width: 306
+                height: 356
   - title: 옵저버 QTE · 타임라인 · 카메라 연출
     intro: >-
       `QTEManager` 가 입력을 **해시로 비교**해 성공/실패를 `Action` 이벤트로 발행하고, 구독자는 QTE 내부를 모른 채
@@ -476,7 +483,7 @@ features:
   # 이미지 3장은 사용자가 ③(3-자산.md)로 넘긴 프로파일러 캡처. 캡션은 이미지 내용 + evidence 로 단 초안이다(사용자 확인·수정).
   - title: 성능 프로파일링 — 스파이크 3종 진단
     intro: >-
-      성능 개선이 목표는 아니었지만, 개발 중 관측된 **스파이크 3종**을 프로파일러로 진단하고 **빌드까지 대조**해
+      개발 중 관측된 **스파이크 3종**을 프로파일러로 진단하고 **빌드까지 대조**해
       진짜 병목과 에디터 아티팩트를 갈랐습니다.
     parts:
       - badge: 에디터 · 씬 로드
@@ -487,7 +494,7 @@ features:
             label: PROFILER
             caption: >-
               플레이를 멈추는 순간의 랙은 `EditorLoop` 99.6%(에디터 전용), 씬 로드 튐은 Unity 내부
-              `GC.Collect` 블로킹 — **둘 다 빌드엔 없는 에디터 아티팩트**입니다.
+              `GC.Collect` 블로킹
       - badge: VSync
         title: 스파이크 3 — Gfx.WaitForPresent 는 VSync 대기
         blocks:
@@ -633,10 +640,6 @@ retrospective:
     - title: 벡터 연산을 조작감으로
       body: 외적·내적·투영이라는 수학이 화면 위 실제 이동으로 이어지는 걸 확인했습니다(수학 → 구현 목표 달성).
   learnings:
-    - title: 스파이크 ≠ 병목
-      body: >-
-        `Gfx.WaitForPresent` 는 무조건 GPU 병목이 아니라 VSync 대기일 수 있고, 에디터 스파이크(`EditorLoop`·씬 로드
-        `GC.Collect`)는 빌드엔 없을 수 있습니다. **프로파일러 수치를 빌드까지 대조**해야 진짜 병목이 보입니다.
     - title: 보스 AI 단조로움 (아쉬움)
       body: 보스 AI 가 추격·공격이라는 단순 패턴이라 어색하고 단조로워 보입니다.
     - title: 연출에 시간 쏠림 (아쉬움)
