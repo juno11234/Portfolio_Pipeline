@@ -11,17 +11,11 @@
 # 5단 매핑: overview / architecture(6계층·계약) / features[파쿠르·전투·가드·AI·연출] / decisions 5건 / retrospective
 subtitle: 3인칭 액션 — 벡터 수학 파쿠르와 타임라인 연출
 overview:
-  lead: >-
-    벡터 연산(외적·내적·투영)으로 **벽 달리기·슬라이딩·활공**을 구현한 파쿠르 이동, `IFighter` 인터페이스와
-    **이벤트 큐**로 송수신을 추상화한 전투 시스템, 그리고 **Timeline·Cinemachine·옵저버 QTE**로 엮은 연출을
-    축으로 한 1인 개발 3인칭 액션 게임입니다.
   what: >-
-    이 문서는 **플레이어/적/보스의 상태 머신, 전투 이벤트 파이프라인, 파쿠르 이동의 수학, QTE·타임라인 연출**이
-    코드에서 어떻게 구성됐는지를 다룹니다 — 코드 지도입니다.
+    벡터 연산(외적·내적·투영)으로 **벽 달리기·슬라이딩·활공**을 구현한 파쿠르 이동, 그리고 **Timeline·Cinemachine·옵저버 QTE**로 엮은 연출을
+    축으로 한 1인 개발 3인칭 액션 게임입니다.
   why: >-
-    게임을 하며 "해보고 싶던" 이동 액션 — 벽 달리기·슬라이딩·활공·워프 — 을 직접 구현하고,
-    **벡터 연산(외적·내적·투영)을 실제 조작감으로 옮기는 것**이 목표였습니다. 컷씬은 코드 타이밍 대신
-    **Timeline 으로 프레임 단위 연출**을 다뤄보고 싶었습니다.
+    게임을 하며 "구현해보고 싶었던" 이동 액션 (벽 달리기·슬라이딩·워프) 과 **Timeline 컷씬 연출**을 직접 구현하는게 목표였습니다.
   evidence: >-
     성능 문제를 고치려 시작한 게 아니라 **기능·연출 학습**이 목표라, 착수를 촉발한 단일 수치는 없습니다.
     대신 개발 중 관측된 **스파이크 3종을 프로파일러로 진단**해 진짜 병목과 아티팩트를 갈랐습니다 —
@@ -87,9 +81,8 @@ architecture:
           relations: >-
             감지 콜라이더(`Blade`/`Bullet`/`Middle_DashAttackColl`)와 `AttackSender` 는 `CombatSysytem` 에 이벤트를
             **등록만** 하고, `CombatSysytem` 이 `IFighter.TakeDamage` 를 **호출**합니다(송신자는 수신자를 모릅니다).
-            상태 클래스는 자신의 StateMachine 을 통해서만 전이하고, 넉백은 `KnockbackClass.KnockbackFunc`(static)로 결합을 끊었습니다.
           flow: >-
-            입력 → 상태 전환 → 애니 재생 → `AttackSender` 가 `normalizedTime` 구간에 히트박스 On → 콜라이더 충돌 →
+            입력 → 상태 전환 → 애니 재생 → `AttackSender` 가 히트박스 On → 콜라이더 충돌 →
             `CombatEvent` 큐 등록 → `CombatSysytem.Update` 가 최대 10개 처리 → `TakeDamage`(hp 차감·사망·그로기) →
             (보스) 그로기/사망 시 QTE·타임라인 연출.
           layers:
@@ -256,23 +249,9 @@ features:
             notes:
               - at: ProjectOnPlane(down, slopeNormal)
                 why: 다운벡터를 경사면(법선)에 투영하면 경사 방향 성분만 남아 바닥을 파고들지 않고 표면을 타고 내려간다.
-      - badge: 스탯
-        title: 이동 스탯
-        blocks:
-          - type: table
-            headers: [스탯, 값]
-            rows:
-              - ['걷기 속도 walkSpeed', '5']
-              - ['달리기 속도 runSpeed', '9']
-              - ['점프 높이 jumpHeight', '3']
-              - ['중력 gravity', '-9.81']
-              - ['최대 점프 횟수 maxJumpCount', '2']
-              - ['슬라이딩 속도 slidingSpeed', '50']
-              - ['벽 점프 수평 속도 wallJumpHorizontalSpeed', '100']
-              - ['활공 속도 flySpeed', '20']
   - title: 이벤트 큐 기반 전투 시스템
     intro: >-
-      모든 피해는 `CombatEvent` 로 만들어 `CombatSysytem` 싱글턴 큐에 넣고, 시스템이 프레임 단위로 꺼내
+      모든 피해는 `CombatEvent` 로 만들어 `CombatSysytem` 싱글톤 큐에 넣고, 시스템이 프레임 단위로 꺼내
       `IFighter.TakeDamage` 를 호출합니다. 히트박스는 애니메이션 클립 진행도가 소유합니다.
     parts:
       - badge: 흐름
@@ -330,16 +309,6 @@ features:
                 why: 공격 애니의 지정 구간에만 검(Blade) 콜라이더를 켜 판정이 모션과 정확히 맞물린다. 타이밍은 코드가 아니라 애니 클립이 소유한다.
               - at: pass* 플래그
                 why: 각 시점을 프레임당 1회만 발동시켜 히트박스 개폐를 중복 없이 처리한다.
-      - badge: 수치
-        title: 전투 수치
-        blocks:
-          - type: table
-            headers: [값, 수치, 출처]
-            rows:
-              - ['프레임당 이벤트 처리 상한 Max_Event_COUNT', '10', 'CombatSysytem']
-              - ['플레이어 검 데미지 Blade.damage', '35', 'Blade']
-              - ['일반 적 총알 데미지 Bullet.damage', '10', 'Bullet']
-              - ['보스 돌진 데미지 Middle_DashAttackColl.damage', '20', 'Middle_DashAttackColl']
   - title: 가드 · 패링 시스템
     intro: >-
       Guard 상태는 진입 직후 **0.3초** 패링 윈도우를 열고, 이후엔 피해를 hp 대신 **가드 스태미나**에서 깎습니다.
@@ -451,20 +420,6 @@ features:
               - src: ../../assets/starwars/starwars-boss-dash.png
                 caption: '**돌진**(DashAttack) — 붉은 예고 범위 후 직선 돌진, 벽에 부딪히면 그로기'
                 background: '#232323'
-      - badge: 스탯 · 최종보스
-        title: AI 스탯과 연출형 최종보스
-        blocks:
-          - type: table
-            headers: [대상, 값, 수치]
-            rows:
-              - ['일반 적', 'hp / 시야각 / 시야거리 / 추적범위', '100 / 120° / 10 / 30']
-              - ['중간보스', 'hp / 스킬 쿨 / 근접 전환 거리 / 그로기', '300 / 15s / 6.5 / 3s']
-          - type: callout
-            badge: 최종보스
-            tone: white
-            body: >-
-              최종보스(`FinalBossAnimatorController`)는 **자체 상태 머신 없이** Animator 트리거 래퍼
-              (Hide/Appear/Scream/Attack…)만 노출합니다 — **타임라인·시그널로 구동되는 연출형 보스**입니다.
   - title: 옵저버 QTE · 타임라인 · 카메라 연출
     intro: >-
       `QTEManager` 가 입력을 **해시로 비교**해 성공/실패를 `Action` 이벤트로 발행하고, 구독자는 QTE 내부를 모른 채
@@ -517,7 +472,39 @@ features:
             body: >-
               `CutsceneManager` 가 컷씬 프리팹을 `Instantiate` 하고 `PlayableDirector.Play` 하며, `BossCameraShakeTrigger`/
               `FlyCameraShakeTrigger` 가 Cinemachine `ImpulseSource` 로 피격·보스 등장·벽 충돌 시 화면을 흔듭니다.
-              `Portal` 진입은 카메라를 흔들고 `waypoints` 를 넘겨 플레이어를 Flying(웨이포인트 추종 비행) 상태로 진입시킵니다.
+  # 성능 프로파일링 — 개발 중 관측한 스파이크 3종을 프로파일러로 진단하고 빌드까지 대조한 조사(② evidence 와 같은 근거).
+  # 이미지 3장은 사용자가 ③(3-자산.md)로 넘긴 프로파일러 캡처. 캡션은 이미지 내용 + evidence 로 단 초안이다(사용자 확인·수정).
+  - title: 성능 프로파일링 — 스파이크 3종 진단
+    intro: >-
+      성능 개선이 목표는 아니었지만, 개발 중 관측된 **스파이크 3종**을 프로파일러로 진단하고 **빌드까지 대조**해
+      진짜 병목과 에디터 아티팩트를 갈랐습니다.
+    parts:
+      - badge: 에디터 · 씬 로드
+        title: 스파이크 1·2 — EditorLoop · GC.Collect
+        blocks:
+          - type: image
+            src: ../../assets/starwars/starwars-perf-editor.png
+            label: PROFILER
+            caption: >-
+              플레이를 멈추는 순간의 랙은 `EditorLoop` 99.6%(에디터 전용), 씬 로드 튐은 Unity 내부
+              `GC.Collect` 블로킹 — **둘 다 빌드엔 없는 에디터 아티팩트**입니다.
+      - badge: VSync
+        title: 스파이크 3 — Gfx.WaitForPresent 는 VSync 대기
+        blocks:
+          - type: image
+            src: ../../assets/starwars/starwars-perf-vsync.png
+            label: PROFILER
+            caption: >-
+              지속되는 작은 스파이크를 `Gfx.WaitForPresent` GPU 병목으로 의심했으나, 정상 구간과 `PlayerLoop`
+              처리 시간이 같아 `EditorLoop` 차이였습니다.
+          - type: image
+            src: ../../assets/starwars/starwars-perf-build.png
+            variant: aside
+            width: 460
+            label: PROFILER
+            caption: >-
+              빌드 후 측정 — `Gfx.WaitForPresent` 는 GPU 병목이 아니라 **VSync 모니터 갱신 대기**였고,
+              빌드는 쾌적하게 작동했습니다.
 decisions:
   - title: 적 시야 판정 — 정확한 계산 vs 대소 비교 최적화
     options:
@@ -562,10 +549,10 @@ decisions:
           - 벽 각도에 따라 흔들림
           - 기울어져도 일관된 수평 이동
     reason: >-
-      처음엔 직관적으로 투영으로 짰는데, **기울어진 벽에서 캐릭터가 경사를 따라 위/아래로 새는 문제**가 나왔습니다.
+      처음엔 직관적으로 투영으로 짰는데, **기울어진 벽에서 캐릭터가 경사를 따라 위로 새는 문제**가 나왔습니다.
       원인은 투영이 "벽 평면 위 방향"을 주다 보니 벽 기울기가 진행 방향에 섞여 든 것. ==외적 `Cross(법선, 업벡터)` 는
       두 벡터에 동시에 수직인 축을 주므로, 벽이 얼마나 기울든 항상 수평인 진행 축이 나옵니다.== 벽 타는 조작감은
-      기울어져도 수평이 유지돼야 안정적이라 외적으로 바꿨습니다. (투영이 나쁜 게 아니라 슬라이딩엔 투영이 맞습니다 — 회고 참조.)
+      기울어져도 수평이 유지돼야 안정적이라 외적으로 바꿨습니다.
   - title: 보스 AI 구현 — 단일 클래스 vs 상태 패턴
     options:
       - { key: A, title: 단일 클래스 (enum + switch) }
@@ -637,7 +624,6 @@ decisions:
     reason: >-
       입력마다 정답과 비교하는데 문자열은 매번 문자 단위로 대조해 상대적으로 비쌉니다. **시작 시 정답 시퀀스를 한 번 해시로
       만들어 두면 입력 비교가 int 한 번**으로 끝납니다. QTE 는 짧은 시간에 입력이 몰려 비교가 잦으므로 ==해시 비교== 로 바꿨습니다.
-      (규모가 작아 체감 차이는 미미 — "측정했나"를 물으면 **정석 습관** 관점으로 답할 수 있습니다.)
 retrospective:
   results:
     - 에디터 재생 랙(`66ms / 15FPS`) — 원인 `EditorLoop` 99.6%(에디터 전용) → 빌드엔 없음
@@ -646,26 +632,9 @@ retrospective:
   satisfaction:
     - title: 이동 액션을 원하는 만큼
       body: 게임을 하며 해보고 싶던 이동 액션(벽 달리기·슬라이딩·활공·워프)을 모두 만족스럽게 구현했습니다.
-    - title: 전투를 이벤트 큐로 분리
-      body: >-
-        모든 피해를 `CombatEvent` 로 만들어 `IFighter` 로 주고받게 해, 송신자가 수신자를 몰라도 되는 결합을 만들었습니다.
-        감지 콜라이더는 **등록만**, `CombatSysytem` 이 `TakeDamage` **호출**을 책임집니다.
     - title: 벡터 연산을 조작감으로
       body: 외적·내적·투영이라는 수학이 화면 위 실제 이동으로 이어지는 걸 확인했습니다(수학 → 구현 목표 달성).
   learnings:
-    - title: 같은 투영이라도 문제에 따라
-      cells:
-        - label: 무엇을
-          body: 벽 달리기를 직관적으로 **투영**으로 짰다.
-        - label: 문제
-          body: '기울어진 벽에서 경사가 진행 방향에 섞여 !!위/아래로 새는 버그!!. 투영은 슬라이딩(경사 하강)엔 맞지만 벽 달리기(수평 유지)엔 안 맞았다.'
-        - label: 알게된 점
-          body: 벡터 연산은 "무엇이 옳다"가 아니라 **문제에 맞는 걸 골라야 한다**는 걸 체감했다(→ ==외적==으로 교체).
-      tint: true
-    - title: sqrt 는 호출 빈도로 판단
-      body: >-
-        적 시야 판정(매 프레임)에선 sqrt·acos 를 피했지만, 점프 높이 계산(입력당 1~2회)에선 `Mathf.Sqrt` 를 그대로 써
-        가독성을 택했습니다. **같은 연산도 빈도에 따라 다르게** 판단해야 한다는 걸 배웠습니다.
     - title: 스파이크 ≠ 병목
       body: >-
         `Gfx.WaitForPresent` 는 무조건 GPU 병목이 아니라 VSync 대기일 수 있고, 에디터 스파이크(`EditorLoop`·씬 로드
@@ -679,5 +648,3 @@ retrospective:
       body: 보스 AI 를 추격·공격 루프 너머로 — 유틸리티 AI·행동 트리 등 더 지능적인 패턴을 탐색해 단조로움을 줄입니다.
     - title: 우선순위 관리
       body: 연출에 시간이 쏠려 전투를 못 끝낸 걸 반복하지 않게, Todo 리스트로 작업 우선순위를 관리합니다.
-    - title: 이벤트 상한 효과 검증
-      body: 전투 이벤트 프레임당 처리 상한(`Max_Event_COUNT`=10)이 실제로 스파이크를 줄이는지 프로파일러 전후 비교로 검증하거나, 근거가 없으면 수치 주장을 뺍니다.
