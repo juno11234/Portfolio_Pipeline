@@ -159,7 +159,7 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
       <>
         <ChapterDivider num={num(decisionsNo)} total={num(totalSections)} />
         <SectionHead num={num(decisionsNo)} title="고민과 선택" id="sec-decisions">
-          <p class="plede" style="margin:34px 0 4px">"그냥"은 금지어입니다. 왜 다른 방법이 아닌 이 방법인지에 대한 근거입니다.</p>
+          {/* 섹션 설명 문구('"그냥"은 금지어…')는 2026-07-24 사용자 결정으로 제거. 첫 결정의 PartTitle 이 바로 온다. */}
           {d.decisions.map((dec, i) => (
             <>
               <PartTitle badge={`결정 ${i + 1}`} title={dec.title} margin="34px 0 6px" />
