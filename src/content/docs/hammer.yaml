@@ -498,6 +498,10 @@ retrospective:
       caption: >-
         빌드 디버깅 회고 — 싱글톤 결합도가 2차 빌드 후 안드로이드에서만 매니저 null 참조로 드러난 과정
         (증상 → 추적 → 원인 → 임시방편 → 근본 원인), 그리고 DI(VContainer)로 이어진 개선.
+    - src: ../../assets/Corporate/retro-developer-role.png
+      caption: >-
+        개발자의 역할 — 완성 후 받은 첫 질문이 "직접 플레이해보고 재미있었나요?"였다. 진행도 · 구현만 논의하고
+        플레이어 경험(재미)은 아무도 말하지 않아, 재미의 책임을 기획팀에만 미룬 셈이었다는 깨달음.
     - src: ../../assets/Corporate/retro-improvements.png
       caption: >-
         개선 제안(설계 · 미구현) — 전투(웨이브로 성장 체감) · 선택지(스킬 자체의 진화) · 강화(실패 보정 확률) 세 가지.
