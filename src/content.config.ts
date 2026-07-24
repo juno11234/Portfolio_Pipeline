@@ -736,6 +736,17 @@ const projectDocs = defineCollection({
       learnings: z.array(retroCard).min(1),
       /** 다음 계획(개선) — 카드. **필수 게이트.** 부채만 적고 계획이 없으면 반쪽이다. */
       improvements: z.array(retroCard).min(1),
+      /**
+       * 회고를 구조화 카드 대신 **스크린샷으로 대체 렌더**한다(dc 로 못 그리는 커스텀 회고 디자인 — 기업협약이 첫 사례).
+       *
+       * ⚠ **렌더만 바꾼다 — 게이트는 그대로다.** learnings·improvements 는 위에서 여전히 필수라 yaml 에 남아야 하고
+       * (없으면 빌드 실패), 이 필드가 있으면 [slug].astro 가 카드 대신 이 이미지들을 그린다. 데이터는 살고 화면만 바뀐다
+       * — 개요 '10초 요약'(evidence 필수·렌더만 뺌)과 같은 방식이다. 게이트를 완화하는 게 아니다.
+       */
+      screenshots: z
+        .array(z.object({ src: image(), caption: z.string().min(1) }))
+        .min(1)
+        .optional(),
     }),
   }).superRefine((doc, ctx) => {
     /*

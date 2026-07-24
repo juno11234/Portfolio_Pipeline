@@ -173,6 +173,17 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
     {/* ⑤ 결과 · 회고 */}
     <ChapterDivider num={num(retroNo)} total={num(totalSections)} />
     <SectionHead num={num(retroNo)} title="결과 · 회고" id="sec-retro">
+      {d.retrospective.screenshots !== undefined ? (
+        /*
+          회고를 스크린샷으로 대체 렌더한다(기업협약 — dc 로 못 그리는 커스텀 회고 디자인, 2026-07-24 사용자 결정).
+          learnings·improvements 는 스키마 게이트로 yaml 에 그대로 살아 있고(빌드 필수), 여기선 화면만 이미지로 바꾼다.
+          되살리려면 yaml 의 retrospective.screenshots 를 지운다 — 그러면 아래 else 의 카드 렌더로 돌아간다.
+        */
+        d.retrospective.screenshots.map((s) => (
+          <Figure src={s.src.src} alt={s.caption} kind="body" background="#0d0d0d" label="RETROSPECTIVE" caption={s.caption} margin="18px 0 12px" />
+        ))
+      ) : (
+      <>
       {d.retrospective.results !== undefined && (
         <>
           <h3 class="ph3" style="margin:34px 0 6px">결과</h3>
@@ -215,6 +226,8 @@ const partMargin = (i: number): string => (i === 0 ? '36px 0 6px' : '44px 0 6px'
         <StackCards margin="16px 0 4px" cards={d.retrospective.improvements.map((c) => ({ title: c.title, body: c.body ?? '' }))} />
       ) : (
         <PrincipleCards margin="16px 0 4px" cards={d.retrospective.improvements.map((c) => ({ title: c.title, body: c.body ?? '' }))} />
+      )}
+      </>
       )}
     </SectionHead>
 
