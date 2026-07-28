@@ -90,6 +90,8 @@ links:
     url: https://youtu.be/kCM6ASBUIEo
   - label: 깃허브
     url: https://github.com/juno11234/VamSirLike
+  - label: 기술 문서 (Canva)
+    url: https://canva.link/9hue5cc8nhbogyf
 
 # ── ② 시스템 구조 ─────────────────────────────────────────────────────────
 architecture:

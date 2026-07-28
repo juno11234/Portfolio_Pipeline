@@ -71,6 +71,8 @@ links:
     url: https://youtu.be/5G6cZHsmhQ0
   - label: GitHub 저장소
     url: https://github.com/juno11234/soulLike
+  - label: 기술 문서 (Canva)
+    url: https://canva.link/5ji2bejgwsjssco
 architecture:
   title: 시스템 구조
   intro: >-

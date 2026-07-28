@@ -52,9 +52,6 @@ overview:
       - category: 입력
         tech: Input System
         purpose: 테스트 유닛(TestPlayer)의 입력을 액션맵으로 분리
-      - category: 직렬화
-        tech: Newtonsoft.Json
-        purpose: 스킬(SkillBase)의 세이브/로드 직렬화 ([JsonProperty]/[JsonIgnore] 병용)
 
 screenshot:
   src: ../../assets/bond/bond-gameplay.png
@@ -74,6 +71,8 @@ links:
     url: https://youtu.be/OQSDaqbAk8Y
   - label: 깃허브
     url: https://github.com/Dost-Released-Project/Bond
+  - label: 기술 문서 (Canva)
+    url: https://canva.link/vtzoj8zlr1fo573
 
 # ── ② 시스템 구조 ─────────────────────────────────────────────────────────
 architecture:
