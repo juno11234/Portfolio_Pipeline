@@ -116,11 +116,13 @@ const history = [
   }
   .name { font-size: 52px; font-weight: 800; letter-spacing: -.035em; line-height: 1.02; }
   .tagline {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--ink-soft);
     margin-top: 11px;
-    max-width: 42ch;
+    /* 한 줄로 담기게: 15px·max-width 42ch(≈402px)면 이 문구가 ~20px 모자라 어중간히 줄바꿈됐다.
+       14px 면 393px 라 히어로 텍스트 칼럼(≈402px)에 한 줄로 들어간다. max-width 는 걷어냈고
+       (칼럼 폭이 사실상 상한), 화면이 좁아지면 칼럼이 줄며 자연 줄바꿈된다 — 오버플로 없음. */
   }
 
   .chips { display: flex; gap: 7px; flex-wrap: wrap; }
