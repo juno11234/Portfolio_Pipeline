@@ -66,9 +66,9 @@ meta:
   ide: Visual Studio
 
 links:
-  - label: 유튜브
+  - label: 플레이 영상 (YouTube)
     url: https://youtu.be/gDnDArFUUmw
-  - label: 깃허브
+  - label: GitHub 저장소
     url: https://github.com/Corporate-Agreement-Project-In-Kyung-Il/Corporate-Agreement
 
 # ── ② 시스템 구조 ─────────────────────────────────────────────────────────

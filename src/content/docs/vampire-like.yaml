@@ -86,9 +86,9 @@ meta:
 
 # links — ③ 자산에서. 추적 파라미터·.git 접미사는 벗겼다.
 links:
-  - label: 유튜브
+  - label: 플레이 영상 (YouTube)
     url: https://youtu.be/kCM6ASBUIEo
-  - label: 깃허브
+  - label: GitHub 저장소
     url: https://github.com/juno11234/VamSirLike
   - label: 기술 문서 (Canva)
     url: https://canva.link/9hue5cc8nhbogyf

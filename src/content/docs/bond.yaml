@@ -65,11 +65,11 @@ meta:
   ide: Rider 2025.2.1
 
 links:
-  - label: 유튜브 — 튜토리얼
+  - label: 튜토리얼 영상 (YouTube)
     url: https://youtu.be/pl6heL8qC0A
-  - label: 유튜브 — 전투
+  - label: 전투 영상 (YouTube)
     url: https://youtu.be/OQSDaqbAk8Y
-  - label: 깃허브
+  - label: GitHub 저장소
     url: https://github.com/Dost-Released-Project/Bond
   - label: 기술 문서 (Canva)
     url: https://canva.link/vtzoj8zlr1fo573
