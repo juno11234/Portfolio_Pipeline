@@ -73,10 +73,10 @@ links:
 architecture:
   title: 시스템 구조
   intro: >-
-    스킬 시스템은 **데이터(SO)와 실행(프리팹)을 분리**하고, 둘을 **정수 ID(`ISkillID`)로만** 잇습니다. `SkillManager`가
+    스킬 시스템은 **데이터(SO)와 실행(프리팹)을 분리**하고, 둘을 **정수 ID 계약으로만** 잇습니다. 스킬 매니저가
     중앙에서 에디터 수집 → 런타임 복제 → ID 매칭 배분 → 강화까지 담당하는 **파사드/오케스트레이터**입니다. 사운드
-    시스템은 이와 독립된 두 싱글톤(`SFXManager` · `BGMManager`)이며, 스킬 실행부(`AquaBall`)가
-    `SFXManager.Play(skillSound)`로 사운드에 붙는 것이 유일한 접점입니다.
+    시스템은 이와 독립된 두 싱글톤(효과음 매니저 · BGM 매니저)이며, 스킬 실행부가
+    사운드 재생 메서드를 부르는 것이 유일한 접점입니다.
   parts:
     - badge: 구성요소
       title: 스킬 · 사운드 4계층
@@ -125,8 +125,8 @@ architecture:
     - badge: 관계
       title: ISkillID 계약 — 데이터와 실행이 공유
       lede: >-
-        데이터(`ActiveSkillSO` · `BuffSO`)와 실행(`AquaBall`)이 **같은 `ISkillID` 계약을 공유**하는 것이 이 시스템의
-        핵심입니다. `ActiveSkillBase`는 모든 실행 스킬의 추상 베이스입니다.
+        데이터와 실행이 **같은 정수 ID 계약을 공유**하는 것이 이 시스템의
+        핵심입니다. 별도의 추상 베이스가 모든 실행 스킬의 공통 뼈대입니다.
       blocks:
         - type: mermaid
           question: 데이터와 실행 두 축은 무슨 계약을 공유하고 누가 구현하나?
@@ -156,8 +156,8 @@ features:
       - badge: 계약
         title: 데이터 · 실행이 같은 int ID를 공유
         lede: >-
-          스킬의 "데이터"(밸런싱용 SO)와 "실행"(씬 프리팹)은 서로를 몰라야 합니다. 그래서 **양쪽 모두 `ISkillID`를
-          구현**하고, `SetSkillID()`에서 에셋에 박힌 `Skill_ID`를 런타임 `SkillID`로 복사합니다. 매니저는 "이 플레이어가
+          스킬의 "데이터"(밸런싱용 SO)와 "실행"(씬 프리팹)은 서로를 몰라야 합니다. 그래서 **양쪽 모두 같은 ID 계약을
+          구현**하고, 초기화 시 에셋에 박힌 고정 ID를 런타임 ID로 복사합니다. 매니저는 "이 플레이어가
           가진 스킬 ID" 배열만 보고 같은 ID의 데이터/실행을 **직접 참조 없이** 이어붙입니다.
         blocks:
           - type: code
@@ -198,8 +198,8 @@ features:
       - badge: SkillManager
         title: 수집 → 복제 → ID 배분
         lede: >-
-          `AutoAssignSkillObjects()`가 스킬 SO 폴더를 `AssetDatabase.FindAssets` + LINQ로 훑어 인스펙터 드래그 없이
-          `Origin_skillObjects`를 채우고, 시작 시 각 원본을 `Instantiate`로 **복제**한 뒤 `ISkillID`만 필터해 플레이어
+          자동 수집 도구가 스킬 데이터 폴더를 훑어 인스펙터 드래그 없이 원본 목록을 채우고,
+          시작 시 각 원본을 **복제**한 뒤 ID 계약을 구현한 것만 필터해 플레이어
           보유 ID와 대조해 슬롯에 배분합니다. **수집 · 복제 · 연결을 매니저 한 곳이 책임집니다.**
         blocks:
           - type: code
@@ -240,7 +240,7 @@ features:
             badge: 주의
             tone: white
             body: >-
-              `AutoAssignSkillObjects`는 `#if UNITY_EDITOR`라 빌드에는 포함되지 않습니다. 따라서 **런타임 전 에디터에서
+              자동 수집 도구는 에디터 전용(`#if UNITY_EDITOR`)이라 빌드에는 포함되지 않습니다. 따라서 **런타임 전 에디터에서
               수집이 끝나 있어야** 합니다.
 
   - title: SkillEnchant — 레벨업 강화(액티브/버프 분기)
@@ -248,7 +248,7 @@ features:
       - badge: SkillEnchant
         title: 테이블 값을 타입별로 복제본에 누적
         lede: >-
-          레벨업 시 선택 ID로 `OptionChoice_SkillOption`(엑셀 테이블)에서 강화 수치 한 줄을 조회하고, 대상 스킬 ID를 가진
+          레벨업 시 선택 ID로 강화 수치 테이블(엑셀)에서 한 줄을 조회하고, 대상 스킬 ID를 가진
           플레이어 스킬을 찾아 **타입별로 다르게** 적용합니다 — 액티브면 레벨/쿨감/데미지, 버프면 레벨/쿨감/지속/발동확률.
           **버프 쿨타임은 하한 0.1초로 클램프**합니다.
         blocks:
@@ -298,9 +298,9 @@ features:
       - badge: 실행 베이스
         title: 곡선→직선 유도 + 자기 ID로 스탯 확정
         lede: >-
-          `ActiveSkillBase`(추상 MonoBehaviour)가 모든 실행 스킬의 공통 뼈대(`owner` · `skillSound` · `SkillStat` ·
-          `abstract Initialize()`)입니다. `AquaBall`은 최근접 적을 향해 처음엔 **곡선(유도)**, 가까워지면 **직선**으로
-          접근해 터지고, `Initialize()`에서 `owner.skills[]` 중 자기 ID의 SO를 찾아 데미지 · 범위를 확정합니다.
+          추상 실행 베이스가 모든 실행 스킬의 공통 뼈대(소유자 · 스킬 사운드 · 스탯 ·
+          초기화 메서드)입니다. 이 유도 투사체는 최근접 적을 향해 처음엔 **곡선(유도)**, 가까워지면 **직선**으로
+          접근해 터지고, 초기화 시 소유자의 스킬 목록 중 자기 ID의 데이터를 찾아 데미지 · 범위를 확정합니다.
         blocks:
           - type: code
             api: AquaBall.cs · MoveToEnemyHurt() · Initialize()
@@ -345,7 +345,7 @@ features:
             badge: 접점
             tone: tint
             body: >-
-              `Start()`의 `SFXManager.Instance.Play(skillSound)` — 스킬 시스템이 사운드 시스템에 붙는 **유일한 지점**입니다.
+              스킬이 시작될 때 효과음 재생을 호출하는 것 — 스킬 시스템이 사운드 시스템에 붙는 **유일한 지점**입니다.
           - type: figure-grid
             cells:
               - src: ../../assets/Corporate/swordSkill.png
@@ -362,9 +362,9 @@ features:
       - badge: 사운드
         title: 겹침 재생 · 상태 교체 · 버튼 하나로 에셋 생성
         lede: >-
-          `SFXManager`(싱글톤)는 `AudioSource`를 `poolSize(10)`개 미리 만들어 **재생 중이 아닌 소스**에 실어 효과음을
-          겹쳐 재생합니다. `BGMManager`는 `BGMState`를 `Dictionary`로 조회해 **현재 클립과 다를 때만** 교체하고,
-          `SoundExecel`(에디터 툴)은 `SE_*.mp3`를 훑어 `SFXData` 에셋을 **일괄 자동 생성**합니다.
+          효과음 매니저(싱글톤)는 오디오 소스를 10개 미리 만들어 **재생 중이 아닌 소스**에 실어 효과음을
+          겹쳐 재생합니다. BGM 매니저는 상태별 곡을 사전으로 조회해 **현재 클립과 다를 때만** 교체하고,
+          사운드 에디터 툴은 효과음 파일을 훑어 사운드 데이터 에셋을 **일괄 자동 생성**합니다.
         blocks:
           - type: code
             api: SFXManager.cs · Play() / BGMManager.cs · ChangeBGM()
@@ -398,8 +398,7 @@ features:
             badge: 직렬화
             tone: white
             body: >-
-              `Dictionary`는 인스펙터 직렬화가 안 되므로, `BGMData[]`로 받아 시작 시 런타임
-              `Dictionary<BGMState, AudioClip>`로 매핑합니다.
+              딕셔너리(`Dictionary`)는 인스펙터 직렬화가 안 되므로, 배열로 받아 시작 시 런타임 사전으로 매핑합니다.
 
 # ── ④ 고민과 선택 (② 사람이 쓴 판단) ─────────────────────────────────────
 decisions:
@@ -422,8 +421,8 @@ decisions:
           - 타입 몰라도 ISkillID.SkillID로 연결
     reason: >-
       스킬 데이터 SO는 팀원이, 실행 프레임워크는 본인이 만드는 분업이었습니다. 서로 직접 참조하면 한쪽을 고칠 때 다른
-      쪽이 딸려옵니다. 그래서 양쪽이 각자 `SetSkillID()`로 ==에셋에 박힌 Skill_ID를 런타임 SkillID로 복사==하게 하고,
-      매니저는 `obj is ISkillID id`로 구체 타입을 몰라도 같은 ID끼리 이어붙였습니다.
+      쪽이 딸려옵니다. 그래서 양쪽이 각자 초기화 시 ==에셋에 박힌 고정 ID를 런타임 ID로 복사==하게 하고,
+      매니저는 ID 계약만 확인해 구체 타입을 몰라도 같은 ID끼리 이어붙였습니다.
 
   - title: 런타임 스킬 데이터 — 원본 SO 직접 사용 vs 복제본(Instantiate)
     options:
@@ -440,8 +439,8 @@ decisions:
           - 다음 플레이에 초기 상태 복원
     reason: >-
       !!레벨업 테스트 중, 런타임에 바뀐 데이터가 플레이 종료 후에도 그대로 남는 버그!!를 만났습니다. SO는 에셋이라
-      원본이 메모리에 상주해 변경이 그대로 남는 게 원인이었습니다. `MonoBehaviour`가 씬에 복사본으로 로드되는 것처럼
-      ==원본 대신 Instantiate 복제본을 사용==하니 종료 시 폐기되어 원본 오염이 사라졌습니다. 이후 강화(`SkillEnchant`)도
+      원본이 메모리에 상주해 변경이 그대로 남는 게 원인이었습니다. 컴포넌트가 씬에 복사본으로 로드되는 것처럼
+      ==원본 대신 복제본을 사용==하니 종료 시 폐기되어 원본 오염이 사라졌습니다. 이후 강화도
       복제본 스탯만 바꾸므로 프로젝트 원본은 안전합니다.
 
   - title: 겹치는 효과음 재생 — 단일 소스 vs Queue 풀 vs List 탐색 풀

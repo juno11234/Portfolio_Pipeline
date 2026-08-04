@@ -72,7 +72,7 @@ architecture:
   title: 시스템 구조
   intro: >-
     입력 → 상태 머신 → 애니메이션 → 히트박스 → **이벤트 큐** → 데미지 처리로 이어지는 단방향 흐름이 골격입니다.
-    전투 참여자는 모두 `IFighter` 로 추상화되고, 실제 피해 전달은 `CombatSysytem` 싱글턴의 큐가 프레임 단위로 중계합니다.
+    전투 참여자는 모두 공통 전투 계약으로 추상화되고, 실제 피해 전달은 전투 시스템 싱글턴의 큐가 프레임 단위로 중계합니다.
   parts:
     - badge: 구성요소
       title: 6계층 아키텍처 — 입력에서 연출까지
@@ -127,8 +127,8 @@ architecture:
     - badge: 관계
       title: 핵심 인터페이스 계약 · Class Diagram
       lede: >-
-        전투 참여자는 `IFighter`, 상태는 `IPlayerState`/`IBossState` 계약에 의존합니다. `CombatSysytem` 은
-        `Dictionary` 로 콜라이더에서 `IFighter` 를 역참조하므로, 송신자는 수신자의 구체 타입을 모릅니다.
+        전투 참여자는 공통 전투 계약, 상태는 각각의 상태 계약에 의존합니다. 전투 시스템은
+        사전(Dictionary)으로 충돌 콜라이더에서 전투 대상을 역참조하므로, 송신자는 수신자의 구체 타입을 모릅니다.
       blocks:
         - type: mermaid
           question: 전투·상태·이벤트 세 축은 각각 무슨 계약에 의존하고 누가 구현하나?
@@ -192,13 +192,13 @@ architecture:
 features:
   - title: 벡터 수학 파쿠르 이동
     intro: >-
-      이동/전투를 `IPlayerState` 11종으로 나눠 각각 클래스로 구현하고, `PlayerStateMachine.Update` 는 중력·`Move` 만
+      이동/전투를 11종의 상태로 나눠 각각 클래스로 구현하고, 상태 머신은 매 프레임 중력과 이동만
       공통 처리하고 나머지는 현재 상태에 위임합니다. 벽 달리기·슬라이딩·활공은 **벡터 연산**으로 방향을 만듭니다.
     parts:
       - badge: FSM
         title: 플레이어 상태 머신 — Move 허브
         lede: >-
-          `Move` 를 허브로 이동·전투 상태가 전이합니다. 각 상태는 자기 `Enter`/`Exit` 안에서 진입·복귀를 관리합니다.
+          이동 상태를 허브로 이동·전투 상태가 전이합니다. 각 상태는 자기 진입·복귀 시점에 처리를 관리합니다.
         blocks:
           - type: mermaid
             question: 어떤 입력·조건이 어떤 이동 상태로 전이시키나?
@@ -254,8 +254,8 @@ features:
                 why: 다운벡터를 경사면(법선)에 투영하면 경사 방향 성분만 남아 바닥을 파고들지 않고 표면을 타고 내려간다.
   - title: 이벤트 큐 기반 전투 시스템
     intro: >-
-      모든 피해는 `CombatEvent` 로 만들어 `CombatSysytem` 싱글톤 큐에 넣고, 시스템이 프레임 단위로 꺼내
-      `IFighter.TakeDamage` 를 호출합니다. 히트박스는 애니메이션 클립 진행도가 소유합니다.
+      모든 피해는 피해 이벤트로 만들어 전투 시스템 싱글톤 큐에 넣고, 시스템이 프레임 단위로 꺼내
+      대상의 피해 처리 메서드를 호출합니다. 히트박스는 애니메이션 클립 진행도가 소유합니다.
     parts:
       - badge: 흐름
         title: 한 번의 타격이 데미지가 되기까지
@@ -293,7 +293,7 @@ features:
               - at: processCount < Max_Event_COUNT
                 why: 한 프레임 처리량을 10개로 제한한다. 남은 이벤트는 다음 프레임으로 이월돼 순간 부하를 평탄화한다.
               - at: switch (Type) · as 캐스트
-                why: InGameEvent 를 CombatEvent 로 다운캐스트해 수신자(Reciever)의 TakeDamage 로 넘긴다. 현재 Combat 타입만 쓰되 확장 여지를 둔 구조다.
+                why: 상위 이벤트를 피해 이벤트로 다운캐스트해 수신자의 피해 처리로 넘긴다. 현재 전투 타입만 쓰되 확장 여지를 둔 구조다.
           - type: code
             api: PlayerAttackSender.OnStateUpdate() · 애니 진행도로 히트박스 개폐
             code: |-
@@ -352,13 +352,13 @@ features:
               - ['스태미나 회복', '가드 쿨 후 1초당 +1', 'guardCool 2s']
   - title: 이원화된 적 · 보스 AI
     intro: >-
-      일반 적은 **enum switch FSM**(4상태), 중간보스는 **`IBossState` 클래스 State 패턴**(6상태)으로 나눴습니다 —
+      일반 적은 **enum 분기 방식**(4상태), 중간보스는 **상태 클래스 패턴**(6상태)으로 나눴습니다 —
       규모에 맞춰 전이 방식을 다르게 골랐습니다. 최종보스는 자체 상태 머신 없이 타임라인·시그널로 구동됩니다.
     parts:
       - badge: 일반 적
         title: enum switch FSM · 내적 시야 판정
         lede: >-
-          `Enemy` 는 Patrol·Chase·Attack·Die 4상태를 enum switch 로 돌리고, 시야는 각도(내적)+거리로 판정한 뒤
+          일반 적은 순찰·추격·공격·사망 4상태를 enum 분기로 돌리고, 시야는 각도(내적)+거리로 판정한 뒤
           레이캐스트로 차폐를 확인합니다.
         blocks:
           - type: mermaid
@@ -432,7 +432,7 @@ features:
                 height: 356
   - title: 옵저버 QTE · 타임라인 · 카메라 연출
     intro: >-
-      `QTEManager` 가 입력을 **해시로 비교**해 성공/실패를 `Action` 이벤트로 발행하고, 구독자는 QTE 내부를 모른 채
+      QTE 관리자가 입력을 **해시로 비교**해 성공/실패를 이벤트로 발행하고, 구독자는 QTE 내부를 모른 채
       타임라인·연출을 전환합니다. 카메라는 Cinemachine 임펄스로 흔들립니다.
     parts:
       - badge: QTE
@@ -480,8 +480,8 @@ features:
             badge: 카메라
             tone: tint
             body: >-
-              `CutsceneManager` 가 컷씬 프리팹을 `Instantiate` 하고 `PlayableDirector.Play` 하며, `BossCameraShakeTrigger`/
-              `FlyCameraShakeTrigger` 가 Cinemachine `ImpulseSource` 로 피격·보스 등장·벽 충돌 시 화면을 흔듭니다.
+              컷씬 관리자가 컷씬 프리팹을 생성해 재생하며, 카메라 흔들림 트리거들이
+              Cinemachine 임펄스로 피격·보스 등장·벽 충돌 시 화면을 흔듭니다.
   # 성능 프로파일링 — 개발 중 관측한 스파이크 3종을 프로파일러로 진단하고 빌드까지 대조한 조사(② evidence 와 같은 근거).
   # 이미지 3장은 사용자가 ③(3-자산.md)로 넘긴 프로파일러 캡처. 캡션은 이미지 내용 + evidence 로 단 초안이다(사용자 확인·수정).
   - title: 성능 프로파일링 — 스파이크 3종 진단
