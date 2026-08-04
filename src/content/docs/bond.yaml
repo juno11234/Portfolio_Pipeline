@@ -19,12 +19,12 @@ overview:
     절차적으로 생성된 노드 맵을 탐사하며 이벤트와 턴제 전투를 진행하는 **로그라이크 RPG**입니다.
     4인 팀 프로젝트로, 이 문서는 제가 맡은 **원정(Expedition) 모드**만 다룹니다.
   why: >-
-    이전 팀 프로젝트가 **높은 결합도와 싱글톤 남용**으로 실행 순서(`Script Execution Order`)에 묶여 있었습니다.
-    이를 **인터페이스 + DI(VContainer)** 로 걷어내는 것이 1차 목표였고, **AI 코딩 에이전트를 Plan · Build · Review
+    이전 팀 프로젝트가 **높은 결합도와 싱글톤 남용**으로 스크립트 실행 순서에 묶여 있었습니다.
+    이를 **인터페이스 + 의존성 주입(DI)** 으로 걷어내는 것이 1차 목표였고, **AI 코딩 에이전트를 계획 · 구현 · 리뷰
     사이클**로 도입해 프로세스의 실효성을 검증하는 것이 2차 목표였습니다.
   evidence: >-
-    이전 구조는 싱글톤으로 의존 추적이 어렵고 `Script Execution Order` 에 강제로 묶였습니다 — 인터페이스 참조 +
-    DI 로 약한 연결로 바꿔, 이벤트 씬을 RootScope · MapLifetimeScope 없이 **Mock 스코프만으로 단독 실행**할 수 있게
+    이전 구조는 싱글톤으로 의존 추적이 어렵고 스크립트 실행 순서에 강제로 묶였습니다 — 인터페이스 참조 +
+    의존성 주입으로 약한 연결로 바꿔, 이벤트 씬을 상위 스코프 없이 **테스트용 가짜 스코프만으로 단독 실행**할 수 있게
     했습니다. AI 리뷰(정적 분석)로 테스트 없이 결함 **3건**을 사전 제거 — **21개 모듈 · 101개 스크립트** 규모입니다.
   stack:
     title: 선언적 조립 · 씬 경계 통신을 위한 도구 선택
@@ -205,7 +205,7 @@ features:
       - badge: MapGenerator
         title: 10단계 결정론 파이프라인 · 노드 상태 전이
         lede: >-
-          Slay the Spire 식 DAG 맵을 **10단계 파이프라인**으로 만듭니다. `GenerateMap(seed)` 안에서 `System.Random`
+          Slay the Spire 식 DAG 맵을 **10단계 파이프라인**으로 만듭니다. 맵 생성 함수 안에서 난수 생성기
           인스턴스 하나를 만들어 10단계 전체가 공유합니다 — 같은 시드 → 항상 같은 맵.
         blocks:
           - type: image
@@ -339,8 +339,8 @@ features:
       - badge: MVP · 책임 연쇄
         title: switch 없는 효과 체인 + 2차 선택지
         lede: >-
-          `EventSceneController`(로직) · `EventChoicePresenter`(배선) · `IEventChoiceView`(UI 추상) 3분할. 효과 적용은
-          switch 없이 `IEventEffectHandler` 체인에 위임하고, 체인은 **DI 가 조립**합니다(OCP).
+          로직 · 배선 · UI 추상의 3분할 구조입니다. 효과 적용은
+          조건 분기(switch) 없이 핸들러 체인에 위임하고, 체인은 **DI 가 조립**합니다(OCP).
         blocks:
           - type: code
             api: EventEffectApplier.cs · ApplyAsync()
@@ -411,7 +411,7 @@ features:
       - badge: SkillCutSceneInjector
         title: onBattleAction 을 교체 대입
         lede: >-
-          전투 시작 시 각 플레이어의 `onBattleAction`(`Func<BattleContext, UniTask>`)을 **교체 대입**해, 컷씬이 등록된
+          전투 시작 시 각 플레이어의 **전투 행동 델리게이트를 교체 대입**해, 컷씬이 등록된
           스킬이면 컷씬을 먼저 재생한 뒤 원본을 호출합니다. 원본은 클로저로 캡처합니다.
         blocks:
           - type: code
@@ -458,7 +458,7 @@ features:
       - badge: TurnManager
         title: 토글 전투 · 속도 정렬 큐
         lede: >-
-          외부 `IBattleFlowManager.OnBattle` 에 `SwitchBattle` 을 구독합니다 — `m_cts` 가 이미 있으면 **두 번째 발화 =
+          외부 전투 이벤트에 전투 전환 함수를 구독합니다 — 취소 토큰이 이미 있으면 **두 번째 발화 =
           전투 종료** 토글입니다. 매 라운드 속도 + 난수로 정렬하고, 자기 턴 처리 순서 자체가 규칙입니다.
         blocks:
           - type: code
@@ -510,8 +510,8 @@ features:
       - badge: Playables
         title: Track · Clip · Behaviour · Mixer 4파일
         lede: >-
-          두 트랙 모두 `Track`(TrackAsset) → `Clip`(PlayableAsset) → `ClipBehaviour`(데이터) → `MixerBehaviour`(적용)
-          4파일 구조입니다. `MixerBehaviour.ProcessFrame` 이 바인딩 객체에 값을 적용하고, 내장 블렌드 대신 페이드를
+          두 트랙 모두 **트랙 → 클립 → 동작 → 믹서** 4파일 구조입니다.
+          믹서가 매 프레임 바인딩 객체에 값을 적용하고, 내장 블렌드 대신 페이드를
           직접 계산합니다.
         blocks:
           - type: figure-grid
@@ -631,7 +631,7 @@ decisions:
     reason: >-
       A 의 전역 상태 추적 곤란은 !!이전 팀 프로젝트가 실패한 바로 그 원인!!이라 배제했습니다. B 는 씬 로드 API 의
       전달 제약을 그대로 남긴 채 스코프 설계만 복잡해집니다. C 는 ==역할 1개짜리 정적 채널==로
-      좁혀 `Set → Read → Clear` 계약을 명시화하고 `Dispose` 시 `Clear` 로 수명을 관리 — 정적 상태라는 단점은 역할
+      좁혀 '쓰기 → 읽기 → 비우기' 계약을 명시화하고 스코프 종료 시 비우기로 수명을 관리 — 정적 상태라는 단점은 역할
       1개 제한 + 채널 클래스 격리로 감수했습니다.
   - title: 단발 프레임 이펙트를 어떻게 재생할 것인가
     options:
@@ -684,8 +684,8 @@ decisions:
     reason: >-
       AI 가 제안한 A · B 를 그대로 받지 않고 뒤집었습니다. A 는 되돌리기 로직이 호출부마다 산재해 중첩이 깊어질수록
       복원 순서 관리가 복잡해지고, B 는 씬 구조가 늘 때마다 채널 클래스가 증식합니다. 대신 단일 슬롯을
-      ==`Stack<Action<StageResult>>`==로 바꿔 최근 씬부터 `Pop` 하게 하면 씬이 더 중첩돼도 흐름이 맞아떨어지고,
-      `Register`/`Invoke` 시그니처를 유지해 기존 호출부 수정이 최소가 됩니다. (전투 중 컷씬이 뜨면 !!컷씬 콜백이
+      ==스택(Stack) 구조==로 바꿔 최근 씬부터 꺼내게 하면 씬이 더 중첩돼도 흐름이 맞아떨어지고,
+      등록/호출 방식을 그대로 유지해 기존 호출부 수정이 최소가 됩니다. (전투 중 컷씬이 뜨면 !!컷씬 콜백이
       전투 콜백을 덮어써 복귀 못 하던 버그!!가 이 결정의 계기였습니다.)
 
 # ── ⑤ 결과 · 회고 (② 사람이 쓴 판단) ──────────────────────────────────────
@@ -693,8 +693,8 @@ retrospective:
   satisfaction:
     - title: 실행 순서 의존 제거
       body: >-
-        이전 팀 프로젝트에서 겪었던 싱글톤 추적 문제 · 실행 순서 의존 대신 인터페이스 참조 + VContainer로
-        초기화 순서를 제어하고 결합도를 낮추어 TestPlayer 같은 임시Mock으로 테스트가 가능한 환경을 구축하였습니다.
+        이전 팀 프로젝트에서 겪었던 싱글톤 추적 문제 · 실행 순서 의존 대신 인터페이스 참조 + 의존성 주입으로
+        초기화 순서를 제어하고 결합도를 낮추어, 테스트용 임시 객체만으로 테스트가 가능한 환경을 구축하였습니다.
  
     - title: 기존 코드수정 없이 스킬 컷씬 확장
       body: >-
@@ -712,8 +712,8 @@ retrospective:
         못했습니다.
     - title: VContainer Lifetime 을 씬 수명으로 오해
       body: >-
-        자식 Scope 에서 부모 `TurnManager` 접근이 오작동한 걸 계기로, `VContainer` 의 Lifetime 이 씬 수명이 아니라
-        요청을 처리하는 컨테이너 구역 기준임을 ==직접 테스트로 확인==하고 md 로 정리해 팀에 공유했습니다.
+        자식 스코프에서 부모 관리자 접근이 오작동한 걸 계기로, DI 컨테이너의 생명주기(Lifetime)가 씬 수명이 아니라
+        요청을 처리하는 컨테이너 구역 기준임을 ==직접 테스트로 확인==하고 문서로 정리해 팀에 공유했습니다.
   improvements:
     - title: 슬라이스를 코어 루프로 좁힌다
       body: 다음엔 버티컬 슬라이스를 최소 핵심 코어 루프 하나 기준으로 자릅니다.

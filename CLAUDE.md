@@ -469,6 +469,13 @@ dc 로 그리고 본문은 DocBlock 에 넘긴다. (개요 끝에 `Tldr` 도 있
   손대지 않았다. 게이트("'느리다' 대신 '로딩 15초'")를 완화하지 않으면서 화면에서만 내린 것이라, 지금은
   **필수인데 안 그려지는 유일한 필드**다. 되살리는 법은 `[slug].astro` 개요 끝 주석에 적어뒀다.
   dc 의 `Tldr.astro` 는 byte-0 라 지우지 않고 남겼다.
+- **기술 문서 산문은 함수명을 풀어쓴다** (2026-08-04, 사용자 결정). lede·intro·code notes·decision reason·
+  callout·회고 body 등 '읽는 산문'에서는 클래스·함수·필드명 남발을 피하고 자연어로 푼다
+  (`Sequence_Memory` → '진행 위치를 기억하는 노드'). 자료구조·파라미터·기술명(Stack·DAG·UniTask)은 남긴다.
+  **예외: 코드 블록·mermaid·표·계층 노드·api-list 시그니처**는 식별자를 그대로 쓴다(이름이 곧 정보).
+  Zod 로 자동 검증하지 않는다(정당한 기술명까지 오탐 → 게이트 왜곡) — 규칙은 `content.config.ts` 블록 주석과
+  여기에 명문화하고 작성·조립 시 지킨다. 적용: soulslike·bond 완료, 나머지 4개(vampire-like·starwars-jedi·
+  vermintide·hammer)는 순차 적용 예정.
 
 ### 개요는 넷으로 쪼갰다 — Bond 가 반증한 것을 반영
 
