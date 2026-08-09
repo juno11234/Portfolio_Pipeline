@@ -10,6 +10,66 @@ if (profile === undefined) {
 const me = profile.data;
 
 const skills = (await getCollection('skills')).sort((a, b) => a.data.order - b.data.order);
+const projects = await getCollection('projects');
+const docs = await getCollection('projectDocs');
+
+/** GitHub Pages base 대응. Sidebar·Base 와 같은 방식이다. */
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+/** 슬러그로 기술 문서를 찾는다. projects.yaml 의 키 = 문서 파일 이름이다. */
+const docBySlug = new Map(docs.map((doc) => [doc.id, doc]));
+
+/**
+ * 대표 프로젝트만 홈에 낸다.
+ *
+ * 첫 화면에 '무엇을 만들 수 있는 사람인지'가 없고 작품이 사이드바 링크 뒤에만 있었다.
+ * 그외 프로젝트는 여기 싣지 않는다 — 사이드바가 목록을 맡는다(사용자 결정 2026-08-09).
+ */
+const featured = projects
+  .filter((p) => p.data.featured === true)
+  .sort((a, b) => a.data.order - b.data.order);
+
+/**
+ * 문서의 `meta.period` 를 `YYYY.MM — YYYY.MM` 로 줄인다.
+ *
+ * 문서마다 정밀도가 다르다 — `2026.04.02 ~ 2026.07.17` 도 있고 끝 연도를 생략한
+ * `2025.11.10 ~ 11.30` 도 있다. 생략된 연도는 시작 연도로 채운다.
+ */
+function shortPeriod(docPeriod: string): string {
+  const parts = docPeriod.split('~').map((s) => s.trim());
+  const start = parts[0];
+  const year = start.slice(0, 4);
+  const startYm = start.slice(0, 7);
+  if (parts.length < 2) return startYm;
+
+  const end = parts[1];
+  const endHasYear = end.split('.')[0].length === 4;
+  const endYm = endHasYear === true ? end.slice(0, 7) : `${year}.${end.slice(0, 2)}`;
+  // 같은 달에 시작하고 끝난 프로젝트를 `2026.03 — 2026.03` 으로 두 번 적지 않는다.
+  if (startYm === endYm) return startYm;
+  return `${startYm} — ${endYm}`;
+}
+
+/**
+ * 카드에 넣을 한 줄 설명.
+ *
+ * 부제가 장르로 시작하는 문서가 많아(`탑뷰 핵 앤 슬래시 — 스킬…`) 바로 위 장르 줄과 겹친다.
+ * 겹치는 앞부분을 떼고 남는 것만 쓴다. 뱀서라이크처럼 부제가 장르 그 자체면 아무것도 남지 않아
+ * 설명 줄을 통째로 뺀다 — 같은 말을 두 번 쓰느니 없는 게 낫다.
+ */
+function cardHook(subtitle: string, genre: string): string | undefined {
+  if (subtitle.startsWith(genre) === false) return subtitle;
+  const rest = subtitle.slice(genre.length).replace(/^[\s—·-]+/, '');
+  if (rest.length === 0) return undefined;
+  return rest;
+}
+
+/** 카드에 붙일 바깥 링크. 영상·저장소만 남긴다 — 카드가 링크 목록이 되면 안 읽힌다. */
+function cardLinks(links: { label: string; url: string }[]): { label: string; url: string }[] {
+  const video = links.find((l) => l.label.includes('영상'));
+  const repo = links.find((l) => l.label.includes('GitHub') || l.label.includes('깃허브'));
+  return [video, repo].filter((l): l is { label: string; url: string } => l !== undefined);
+}
 
 /** 시작·종료가 모두 있으면 범위로, 자격증처럼 하나뿐이면 그대로 보여준다. */
 function period(startDate: string, endDate: string | undefined): string {
@@ -42,6 +102,55 @@ const history = [
       <span>{me.location} · {me.career}</span>
     </div>
   </header>
+
+  <h2 class="h2">대표 프로젝트</h2>
+  <div class="cards">
+    {featured.map((project, i) => {
+      const doc = docBySlug.get(project.id);
+      const hook = doc === undefined ? undefined : cardHook(doc.data.subtitle, project.data.genre);
+      return (
+        <article class="pcard">
+          {doc !== undefined && (
+            <a class="shot-wrap" href={`${base}/projects/${project.id}`}>
+              <Image
+                class="shot"
+                src={doc.data.screenshot.src}
+                alt={doc.data.screenshot.caption}
+                width={640}
+              />
+            </a>
+          )}
+          <div class="pbody">
+            <div class="phead">
+              <span class="num tnum">{String(i + 1).padStart(2, '0')}</span>
+              <h3><a href={`${base}/projects/${project.id}`}>{project.data.title}</a></h3>
+            </div>
+            <p class="pgenre">
+              {project.data.genre}
+              <span class="dot">·</span>
+              {project.data.team ?? '1인'}
+              {doc !== undefined && (
+                <>
+                  <span class="dot">·</span>
+                  <span class="tnum">{shortPeriod(doc.data.meta.period)}</span>
+                </>
+              )}
+            </p>
+            {hook !== undefined && <p class="psub">{hook}</p>}
+            <div class="plinks">
+              <a class="plink is-doc" href={`${base}/projects/${project.id}`}>기술 문서 →</a>
+              {doc !== undefined && cardLinks(doc.data.links).map((link) => (
+                <a class="plink" href={link.url} target="_blank" rel="noopener noreferrer">
+                  {link.label.replace(/\s*\((YouTube|Canva)\)/, '')}
+                  <span aria-hidden="true">↗</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </article>
+      );
+    })}
+  </div>
 
   <h2 class="h2">이력</h2>
   <div class="rows">
@@ -202,11 +311,69 @@ const history = [
     opacity: .55;
   }
 
+  /*
+   * 대표 프로젝트 카드 — 히어로 바로 아래, 이력보다 위.
+   * 게임 클라이언트는 움직이는 화면이 첫 근거라 썸네일과 영상 링크를 첫 화면에 올린다.
+   */
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .cards + .h2 { margin-top: 36px; }
+
+  .pcard {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color .16s ease, transform .16s ease;
+  }
+  .pcard:hover { border-color: var(--accent-line); transform: translateY(-2px); }
+  .shot-wrap { display: block; background: var(--dark-deep); }
+  /*
+   * 썸네일 높이. 원본이 대체로 16:9 근처(1.8:1)라 카드 폭(≈420px) 기준 232px 면 거의 안 잘린다.
+   * 158px 로 뒀더니 세로 3분의 1이 잘려나가 게임 화면에서 무엇을 보라는 건지 사라졌다.
+   */
+  .shot { width: 100%; height: 232px; object-fit: cover; object-position: center; }
+
+  .pbody { padding: 14px 16px 15px; display: grid; gap: 7px; }
+  .phead { display: flex; align-items: baseline; gap: 8px; }
+  .phead h3 { font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+  .phead a { color: var(--ink); }
+  .phead a:hover { color: var(--accent); }
+  .pgenre { font-size: 12.5px; font-weight: 700; color: var(--ink-faint); }
+  .dot { margin: 0 6px; color: var(--ink-ghost); }
+  .psub {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    font-weight: 600;
+    text-wrap: pretty;
+  }
+  .plinks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+  .plink {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+  .plink span { margin-left: 3px; color: var(--ink-muted); }
+  .plink:hover { color: var(--accent); border-color: var(--accent-line); }
+  .plink.is-doc {
+    background: var(--accent-tint);
+    border-color: var(--accent-line);
+    color: var(--accent-strong);
+  }
+
   @media (max-width: 860px) {
     .name { font-size: 38px; }
     .id { gap: 14px; }
     .photo { width: 74px; height: 95px; }
     .row, .row.is-hist { grid-template-columns: 1fr; gap: 10px; }
     .hist-d { margin-top: 2px; }
+    .cards { grid-template-columns: 1fr; }
   }
 </style>
