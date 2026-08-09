@@ -1,0 +1,115 @@
+/*
+ * 인쇄 · PDF 레이아웃.
+ *
+ * **왜 있나:** 채용 지원은 대부분 첨부파일(PDF) 심사다. 링크만 내면 열리지 않는 경우가 많다.
+ * 파이프라인의 목적은 "손으로 PDF 를 만드는 과정"을 없애는 것이지 PDF 자체를 없애는 게 아니다 —
+ * 그래서 같은 `docs/*.yaml` 에서 화면과 종이를 함께 낸다. 뽑는 법은 `scripts/export-pdf.mjs`.
+ *
+ * **무엇을 하나:** 이 파일은 화면 CSS 를 덮는 **얇은 층**이다. 색·타이포·간격은 건드리지 않는다.
+ * 종이에만 있는 문제 넷만 푼다 — 내비게이션 제거 · 잘리는 상자 · 페이지 경계 · 한 장을 넘는 그림.
+ * dc 컴포넌트(byte-0)는 손대지 않는다. 여기서 바깥에서만 덮는다.
+ */
+
+@media print {
+  /*
+   * 색을 그대로 인쇄한다. 이게 없으면 코드 블록의 다크 프레임 · 강조색 · mermaid 도식이
+   * 브라우저 기본 동작으로 흰 바탕에 검은 글씨로 눌려 문서가 통째로 밋밋해진다.
+   */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 브라우저에서 직접 인쇄(Ctrl+P)할 때의 용지. 스크립트로 뽑을 때는 export-pdf.mjs 값이 이긴다. */
+  @page {
+    size: A4;
+    margin: 12mm 10mm 14mm;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* 화면 전용 장치 — 내비게이션과 확대 오버레이는 종이에서 의미가 없다. */
+  .sidebar,
+  #zoom {
+    display: none !important;
+  }
+
+  /* 사이드바가 빠졌으므로 본문이 폭을 다 쓴다. 여백은 용지 margin 이 준다. */
+  .shell {
+    display: block;
+    min-height: 0;
+  }
+  .main {
+    padding: 0 !important;
+  }
+
+  /*
+   * 화면에서 가로 스크롤로 처리하던 상자들. 종이에는 스크롤이 없어 넘치는 부분이 그냥 잘린다.
+   * 펼쳐 두고, 코드는 줄바꿈을 허용해 오른쪽이 날아가지 않게 한다.
+   */
+  .scroll,
+  .code-wrap,
+  .stack-wrap,
+  .dia-body {
+    overflow: visible !important;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /*
+   * 한 장을 넘는 그림·도식은 페이지 경계에서 잘려 아랫부분이 사라진다.
+   * 높이를 용지 안으로 잡아두면 비율은 그대로 유지된 채 줄어든다.
+   * (`width`·`height` 를 auto 로 되돌려야 가로세로비가 안 깨진다.)
+   */
+  #doc figure img,
+  #doc .dia svg,
+  .page img {
+    max-height: 185mm;
+    width: auto;
+    height: auto;
+  }
+
+  /*
+   * 페이지 경계.
+   * 챕터 구분선(`CHAPTER 03 / 15`)에서 새 장을 시작한다 — 문서가 이미 그 자리를 장 구분으로 쓴다.
+   * dc 의 ChapterDivider 는 클래스가 없고 style 문자열을 못 건드리므로(byte-0)
+   * `#doc` 바로 아래의 `aria-hidden` 상자로 집는다. 그 자리에 오는 건 구분선뿐이다.
+   */
+  #doc > div[aria-hidden='true'] {
+    break-before: page;
+    margin-top: 0 !important;
+  }
+
+  /* 그림·도식이 제목과 갈라지거나 중간에서 끊기지 않게. 위에서 높이를 캡했으므로 한 장에 들어간다. */
+  #doc figure,
+  #doc .dia {
+    break-inside: avoid;
+  }
+
+  /* 제목만 페이지 끝에 남는 것을 막는다. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    break-after: avoid;
+  }
+
+  /* 문단 첫 줄·끝 줄이 혼자 떨어지지 않게. */
+  p,
+  li {
+    orphans: 2;
+    widows: 2;
+  }
+
+  /* 확대 힌트 커서는 종이에서 의미가 없다. */
+  #doc .dia-body,
+  #doc figure img {
+    cursor: auto;
+  }
+}

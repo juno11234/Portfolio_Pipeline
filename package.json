@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "pdf": "astro build && node scripts/export-pdf.mjs",
     "preview": "astro preview",
     "sync": "astro sync",
     "check": "astro check"

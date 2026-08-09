@@ -1,6 +1,8 @@
 ---
 import Sidebar from '../components/Sidebar.astro';
 import '../styles/global.css';
+// 종이·PDF 전용 덮개. 화면에는 영향이 없다(@media print 안에만 있다). scripts/export-pdf.mjs 참조.
+import '../styles/print.css';
 
 /** 사이드바 하단에 펼칠 문서 목차 한 줄 */
 export interface TocItem {
