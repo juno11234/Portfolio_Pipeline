@@ -54,3 +54,13 @@ unity:
   highlights:
     - 커스텀 트랙 구현, 피격 효과 구현, DI 구조 협업
     - 비동기로 리소스 로딩 및 핸들 해제
+
+blender:
+  order: 6
+  title: 3D 에셋 제작
+  items:
+    - Blender
+  highlights:
+    - LOD 모델링 후 FBX 로 유니티 임포트
+    - 캐릭터 리깅
+    - UV 매핑 · 텍스처링
