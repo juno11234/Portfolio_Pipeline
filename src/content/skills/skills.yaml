@@ -62,5 +62,5 @@ blender:
     - Blender
   highlights:
     - LOD 모델링 후 FBX 로 유니티 임포트
-    - 캐릭터 리깅
+    - 캐릭터 리깅, IK 적용
     - UV 매핑 · 텍스처링
