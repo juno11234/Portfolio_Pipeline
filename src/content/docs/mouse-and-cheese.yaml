@@ -1,0 +1,637 @@
+# MouseAndCheese 기술 문서 — 신 파이프라인(코드→md→YAML)으로 조립.
+#
+# 자료(사람이 채운 3양식, src/assets/MouseAndCheese/):
+#   ① 구현: 1-구현-MouseAndCheese.md   (대상 repo MouseAndCheeseGame 의 셰이더 · URP 설정 · C#)
+#   ② 판단: 2-판단-직접.md · 이슈들.txt (결정 3건 · 회고 · 블렌더 임포트/그림자/GC 이슈 메모)
+#   ③ 자산: 3-자산.md                  (스크린샷은 파일명으로 판단 · 깃허브 · 1인 · Github Desktop · Rider)
+#
+# ① 을 대상 저장소와 재대조했다(2026-09-25):
+#   - ① 작성 후 커밋 7a30509 "셰이더 shadowmask 적용"이 들어와 ForwardPass 가 바뀌었다 → 현재 코드로 인용
+#     (GetMainLight(shadowCoord, positionWS, shadowMask) · LIGHTMAP_ON / SHADOWS_SHADOWMASK 키워드 · TEXCOORD1 라이트맵 UV).
+#   - 기간 끝은 마지막 커밋 2026-09-25 (① 의 09.24 보다 하루 뒤).
+#   - ToonOutline_Mat 실제 값 _DepthThreshold 0.015 · _NormalThreshold 0.7 (① 은 셰이더 기본값 0.01/0.4).
+#   - Cascade Split 60/90/120 of 150 = (0.4, 0.6, 0.8) — 스크린샷과 PC_RPAsset 일치.
+#   - GC 수정은 커밋 5aca101 (TMP 텍스트를 Awake 에서 긴 문자열로 미리 채움).
+# 수치: Shadow Casters 142 → 15 · Draw Calls 316 → 173 은 프로파일러 스크린샷 두 장에서 읽었다.
+#   (② results 는 "20이하" 라 적었으나 결정 3 · 스크린샷은 15 — 스크린샷 값을 썼다.)
+#   GC 는 수정 전 64.8KB/255회만 측정돼 있어 '후' 수치는 지어내지 않았다.
+# hero: 사용자가 준 쥐 · 고양이 툰 셰이딩 캡처(hero.png).
+# 블렌더는 사용자 요청대로 섹션 하나에 스크린샷 + 간단 설명만(모델링 · UV · 리깅 · IK · 애니메이션).
+# 코드 하이라이터는 C# 전용이라 HLSL 도 C# 문법으로 칠해진다(C 계열이라 대체로 맞다).
+
+subtitle: 3D 러너 — HLSL 툰 셰이더 · 화면공간 포스트프로세스 · 렌더링 최적화
+
+# ── ① 개요 ─────────────────────────────────────────────────────────────────
+overview:
+  lead: >-
+    쥐가 부엌을 달리며 고양이에게서 도망치는 **3D 러너**입니다. 캐릭터와 주방 소품은 **블렌더에서 직접 모델링 · UV · 리깅 ·
+    애니메이션**까지 만들어 유니티로 가져왔고, 게임 분위기에 맞는 룩은 Shader Graph 없이 **HLSL 로 직접 작성한 URP 셰이더
+    3종**으로 만들었습니다.
+  what: >-
+    오브젝트 단위의 **셀 셰이딩 + 림라이트**, 씬 전체에 한 번 도는 **화면공간 외곽선**, 이동 속도에 반응하는 **라디얼 블러**를
+    다룹니다. 뒤의 둘은 C# 렌더 패스 없이 URP 내장 풀스크린 렌더러 피처에 머티리얼만 꽂아 돌립니다. 셰이더를 붙인 뒤 드러난
+    **그림자 아티팩트 · 그림자 비용 · GC** 를 프로파일러로 추적해 잡은 과정도 함께 담았습니다.
+  why: >-
+    블렌더 Export → 유니티 Import 로 이어지는 **에셋 파이프라인을 직접 끝까지** 경험하고, HLSL 로 툰 셰이더와 렌더러 피처를
+    작성하며 **셰이더가 URP 라이팅 · 그림자 · 깊이 버퍼와 어떻게 맞물리는지** 알고 싶었습니다.
+  evidence: >-
+    툰 셰이더를 붙이자 벽에 **계단 모양 그림자**가 생겼고(첫 Cascade 경계 ≈ 18유닛인데 주방은 카메라에서 20~50유닛),
+    프로파일러에서 **Shadow Casters 142** · Draw Calls 316 이 잡혔으며, UI 텍스트가 한 프레임에 **GC 64.8KB(255회)** 를
+    할당하고 있었습니다.
+  stack:
+    title: Shader Graph 없이 URP 라이팅을 직접 다루기 위한 선택
+    rows:
+      - category: 엔진 · 렌더링
+        tech: Unity 6000.3.19f1 · URP 17.3.0 (Forward+)
+        purpose: 커스텀 HLSL 셰이더를 URP 라이팅 · 그림자 · 렌더러 피처 체계에 맞춰 작성
+      - category: 셰이더 언어
+        tech: HLSL + ShaderLab
+        purpose: 밴딩 임계값 · 림 · 그림자 감쇠 결합을 노드 대신 코드로 직접 제어
+      - category: URP 셰이더 라이브러리
+        tech: Core.hlsl · Lighting.hlsl · Blit.hlsl · DeclareDepthTexture · DeclareNormalsTexture
+        purpose: 좌표 변환 · 메인 라이트 · 그림자 좌표 · 풀스크린 정점 · 깊이/노멀 샘플링을 표준 함수로 재사용 (Lit 원본 include · UsePass 미사용)
+      - category: 풀스크린 패스
+        tech: FullScreenPassRendererFeature ×2
+        purpose: 외곽선 · 라디얼 블러를 C# 렌더 패스 작성 없이 머티리얼만으로 화면 전체에 적용
+      - category: 그림자
+        tech: Cascade 4 (0.4 / 0.6 / 0.8) · Mixed Light · Shadowmask
+        purpose: 러너 카메라 이동 중 계단 그림자 제거 · 정적 오브젝트 그림자 베이크
+      - category: 3D 에셋
+        tech: Blender
+        purpose: 캐릭터 · 주방 소품 모델링 · UV · 텍스처 · 리깅(IK) · 애니메이션
+      - category: 셰이더 구동 C#
+        tech: SpeedEffectController + ScriptableObject
+        purpose: 이동 속도에 따라 블러 강도 · 카메라 FOV 를 SmoothDamp 로 조절
+
+screenshot:
+  src: ../../assets/MouseAndCheese/hero.png
+  caption: >-
+    블렌더에서 직접 만든 쥐 · 고양이 캐릭터를 유니티에서 **HLSL 툰 셰이더**로 그린 모습 — 2단 셀 셰이딩의 또렷한 명암
+    경계와 **화면공간 외곽선**이 보입니다.
+
+meta:
+  team: 1인
+  # 대상 repo git 첫 커밋 ~ 마지막 커밋(셰이더 shadowmask 수정)
+  period: 2026.08.14 ~ 2026.09.25
+  vcs: Github Desktop
+  engine: Unity 6000.3.19f1 · URP 17.3.0
+  ide: Rider
+
+links:
+  - label: GitHub 저장소
+    url: https://github.com/juno11234/MouseAndCheeseGame
+
+# ── ② 시스템 구조 ─────────────────────────────────────────────────────────
+architecture:
+  title: 시스템 구조
+  intro: >-
+    셰이더는 **두 층**으로 나뉩니다. 오브젝트마다 머티리얼로 붙는 툰 셰이더가 색 · 그림자 · 깊이 · 노멀 버퍼를 채우고,
+    불투명 렌더링이 끝난 뒤 풀스크린 렌더러 피처 두 개가 그 버퍼를 읽어 화면 전체에 블러와 외곽선을 한 번씩 입힙니다.
+    툰 셰이더의 **깊이 · 노멀 Pass 가 외곽선과 SSAO 의 공통 데이터 소스**라는 점이 두 층을 잇습니다.
+  parts:
+    - badge: 구성요소
+      title: 셰이더 · 렌더러 · C# 5계층
+      blocks:
+        - type: layers
+          components: >-
+            `.shader` 3개(`ToonLit` · `ToonOutlineFullScreen` · `SpeedRadialBlur`), `.hlsl` 5개(공용 입력 1 + Pass 로직 4),
+            머티리얼(툰 7 + 풀스크린 2), URP 렌더러/파이프라인 에셋, C# 2개(`SpeedEffectController` · `SpeedEffectData`)로 이루어집니다.
+          relations: >-
+            `ToonLit.shader` 의 각 Pass 는 공용 `ToonLitInput.hlsl` 과 **자기 Pass 의 `.hlsl` 하나만** include 합니다.
+            ShadowCaster 가 만든 그림자맵을 ForwardLit 이 읽고, DepthOnly · DepthNormals 가 만든 깊이 · 노멀 텍스처를 SSAO 와
+            외곽선 셰이더가 읽습니다. `SpeedEffectController` 는 블러 머티리얼의 강도 값을 매 프레임 씁니다.
+          flow: >-
+            메인 라이트 · 카메라 → 오브젝트별 `ToonLit`(ShadowCaster → 그림자맵 · DepthOnly/DepthNormals → 깊이 · 노멀 ·
+            ForwardLit → 셀 셰이딩 색) → SSAO → AfterRenderingPostProcessing 에서 라디얼 블러 → 외곽선 → 화면.
+          layers:
+            - name: C# 구동 · DRIVER
+              note: 속도 → 블러 강도 · FOV
+              items:
+                - name: SpeedEffectController
+                - name: SpeedEffectData (SO)
+            - name: 렌더러 설정 · RENDERER
+              note: PC_Renderer · PC_RPAsset
+              items:
+                - name: FullScreenPass (블러)
+                - name: FullScreenPass (외곽선 · Depth + Normal)
+                - name: SSAO
+            - name: 화면공간 셰이더 · FULLSCREEN
+              items:
+                - name: ToonOutlineFullScreen
+                  emphasis: true
+                - name: SpeedRadialBlur
+            - name: 오브젝트 셰이더 · OBJECT
+              note: 진입점 · Properties · Pass 선언
+              items:
+                - name: ToonLit.shader
+                  emphasis: true
+            - name: HLSL 로직 · PASS
+              note: 공용 입력 + Pass 별 로직
+              items:
+                - name: ToonLitInput.hlsl
+                - name: ToonLitForwardPass.hlsl
+                - name: ToonShadowCasterPass.hlsl
+                - name: ToonDepthOnlyPass.hlsl
+                - name: ToonDepthNormalsPass.hlsl
+    - badge: 흐름
+      title: 한 프레임의 렌더 순서
+      lede: >-
+        툰 셰이더가 채운 버퍼를 뒤의 패스들이 **읽기만** 합니다. 외곽선이 머티리얼이 아니라 렌더러 설정에 있어서, 새 오브젝트는
+        툰 셰이더만 쓰면 따로 설정하지 않아도 외곽선 대상이 됩니다.
+      blocks:
+        - type: mermaid
+          question: 툰 셰이더가 만든 버퍼를 누가 읽어 최종 화면이 되나?
+          source: |
+            flowchart LR
+                subgraph OBJ["오브젝트별 ToonLit"]
+                    SC["ShadowCaster"] --> SM[("그림자맵")]
+                    DO["DepthOnly"] --> DT[("깊이 텍스처")]
+                    DN["DepthNormals"] --> NT[("노멀 텍스처")]
+                    FL["ForwardLit · 셀 셰이딩"] --> CC[("카메라 컬러")]
+                end
+                SM --> FL
+                DT --> SSAO["SSAO"]
+                NT --> SSAO
+                CC --> BL["라디얼 블러"]
+                BL --> OL["화면공간 외곽선"]
+                DT --> OL
+                NT --> OL
+                OL --> SCR["화면"]
+
+# ── ③ 핵심 기능 ───────────────────────────────────────────────────────────
+features:
+  - title: ToonLit — 얇은 .shader + Pass 별 .hlsl
+    parts:
+      - badge: 구조
+        title: 선언은 .shader, 계산은 .hlsl
+        lede: >-
+          URP Lit 이 따르는 표준 패턴대로 `.shader` 에는 프로퍼티 · 태그 · Pass 선언 · 키워드만 두고 계산은 전부 `.hlsl` 로
+          뺐습니다. 머티리얼 7개(캐릭터 2 · 주방 5)가 셰이더 하나를 공유하면서, Pass 로직 파일만 따로 고치거나 재사용할 수
+          있습니다. URP 버전마다 내부 이름이 바뀌는 Lit 원본 include · `UsePass` 대신 **최소 HLSL 을 직접** 썼습니다.
+        blocks:
+          - type: table
+            headers: [Pass, 담당 .hlsl, 출력, 누가 소비하나]
+            rows:
+              - [ForwardLit, ToonLitForwardPass, 셀 셰이딩 색, 카메라 컬러]
+              - [ShadowCaster, ToonShadowCasterPass, 그림자맵 깊이, 다른 오브젝트의 shadowAttenuation]
+              - [DepthOnly, ToonDepthOnlyPass, 깊이, _CameraDepthTexture]
+              - [DepthNormals, ToonDepthNormalsPass, 월드 노멀, SSAO · 화면공간 외곽선]
+          - type: code
+            api: ToonLit.shader · ForwardLit Pass
+            code: |-
+              Pass
+              {
+                  Name "ForwardLit"
+                  Tags { "LightMode" = "UniversalForward" }
+                  Cull Back
+
+                  HLSLPROGRAM
+                  #pragma vertex ToonVertex
+                  #pragma fragment ToonFragment
+
+                  #pragma multi_compile _ _MAIN_LIGHT_SHADOWS // 메인 라이트가 그림자를 드리우는지
+                  #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE // 카메라 거리에 따라 그림자 해상도 사용여부
+                  #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_SCREEN // 그림자를 화면공간에서 한번 더 처리
+                  #pragma multi_compile_fragment _ _SHADOWS_SOFT // 픽셀 단계에서만 분기
+                  #pragma multi_compile _ LIGHTMAP_ON
+                  #pragma multi_compile _ LIGHTMAP_SHADOW_MIXING
+                  #pragma multi_compile _ SHADOWS_SHADOWMASK
+
+                  #include "ToonLitInput.hlsl"
+                  #include "ToonLitForwardPass.hlsl"
+                  ENDHLSL
+              }
+            notes:
+              - at: '#include 두 줄'
+                why: '"공용 입력 + 이 Pass 로직"이라는 파일 구조 그 자체다. 공용 블록에 몰아넣지 않아 Pass 마다 필요한 것만 컴파일된다.'
+              - at: multi_compile 그림자 키워드
+                why: URP 그림자 설정에 맞는 변형만 쓰여 쓰지 않는 그림자 연산 비용을 아낀다. 소프트 섀도는 프래그먼트 단계에서만 분기한다.
+              - at: LIGHTMAP_ON · SHADOWS_SHADOWMASK
+                why: 정적 오브젝트 그림자를 구운 뒤에 추가한 키워드다. 이게 없어 베이크 후 그림자가 전부 사라졌다(렌더링 최적화 섹션).
+          - type: callout
+            badge: 핵심
+            tone: tint
+            title: SRP Batcher 호환
+            body: >-
+              머티리얼별 프로퍼티 8개를 전부 `UnityPerMaterial` 상수 버퍼 안에 선언했습니다. 머티리얼 7개가 같은 셰이더를 공유하므로
+              배칭이 깨지지 않습니다. 텍스처 · 샘플러만 버퍼 밖에 둡니다.
+
+  - title: ForwardLit — 2단 셀 셰이딩 + 그림자 감쇠 + 림라이트
+    parts:
+      - badge: ForwardLit
+        title: 그림자까지 같은 셀 경계를 따른다
+        lede: >-
+          램버트 항에 그림자 감쇠를 **먼저 곱한 뒤** 두 단계로 양자화합니다. 그래서 그림자맵 그림자도 셀 셰이딩과 같은 경계를
+          따르고, 따로 합성하지 않습니다. 그림자는 검게 누르지 않고 **푸른 회색 그림자색 ↔ 라이트색 보간**으로 카툰 톤을 냈고,
+          림라이트는 그림자 쪽엔 뜨지 않게 막았습니다.
+        blocks:
+          - type: code
+            api: ToonLitForwardPass.hlsl · ToonFragment
+            code: |-
+              // 정적 오브젝트면 구워둔 shadowmask에서, 동적 오브젝트면 unity_ProbesOcclusion 에서 값 가져옴
+              half4 shadowMask = SAMPLE_SHADOWMASK(input.staticLightmap);
+              Light mainLight = GetMainLight(input.shadowCoord, input.positionWS, shadowMask);
+
+              half NdotL = dot(normalWS, mainLight.direction); // 램버트 반사 기본 항
+              half litMask = NdotL * mainLight.shadowAttenuation; // 그림자에 가려지지 않은 정도를 곱함
+
+              // 툰 셰이더는 smoothstep으로 임계값(ShadowThreshold) 기준 0, 1 두단계로 나눔
+              half lightBand = smoothstep(_ShadowThreshold - _ShadowSmoothness,
+                                          _ShadowThreshold + _ShadowSmoothness, litMask);
+
+              half3 shading = lerp(_ShadowColor.rgb, mainLight.color, lightBand);
+              half3 albedo = baseColor.rgb * shading; // 셀 셰이딩 적용
+
+              float3 viewDirWS = normalize(GetCameraPositionWS() - input.positionWS);
+              half rim = 1.0 - saturate(dot(viewDirWS, normalWS));
+              // lightBand를 곱해 이미 그림자져있는 부분 반영
+              half rimBand = smoothstep(_RimThreshold - _RimSmoothness,
+                                        _RimThreshold + _RimSmoothness, rim) * lightBand;
+
+              half3 finalColor = albedo + _RimColor.rgb * rimBand;
+            notes:
+              - at: litMask
+                why: 이 한 줄이 "그림자맵 그림자도 셀 경계를 따른다"를 만든다. 감쇠를 양자화 전에 곱하기 때문이다.
+              - at: smoothstep(threshold ± smoothness)
+                why: 계단 함수 대신 폭이 있는 부드러운 경계로 0/1 을 나눠 경계의 계단현상을 줄인다. 3단 이상은 저해상도 텍스처와 충돌해 2단으로 두었다.
+              - at: '* lightBand'
+                why: 그림자 영역에는 림을 더하지 않는다. 가구와 겹칠 때 캐릭터 실루엣만 살린다.
+              - at: SAMPLE_SHADOWMASK
+                why: 구운 그림자(정적)와 실시간 그림자(동적)를 같은 호출로 받는다. 값을 넘기면 URP 가 알아서 구분한다.
+          - type: mermaid
+            question: 한 픽셀의 최종 색은 어떤 단계를 거쳐 나오나?
+            source: |
+              flowchart LR
+                  A["_BaseMap × _BaseColor"] --> BC["baseColor"]
+                  N["normal · lightDir"] --> L["NdotL"]
+                  L -->|"× shadowAttenuation"| M["litMask"]
+                  M -->|"smoothstep"| LB["lightBand"]
+                  LB -->|"lerp(ShadowColor, lightColor)"| SH["shading"]
+                  BC --> AL["albedo"]
+                  SH --> AL
+                  V["view · normal"] -->|"1 − x"| R["rim"]
+                  R -->|"smoothstep × lightBand"| RB["rimBand"]
+                  AL --> F["finalColor"]
+                  RB -->|"× RimColor"| F
+          - type: table
+            headers: [프로퍼티, 범위, 기본값, 역할]
+            rows:
+              - [_ShadowColor, 색, '(0.6, 0.6, 0.7)', 그림자 쪽 색 — 검정이 아닌 푸른 회색]
+              - [_ShadowThreshold, 0 ~ 1, '0.5', 밝음/그림자를 가르는 기준]
+              - [_ShadowSmoothness, 0.001 ~ 0.3, '0.05', 경계 폭]
+              - [_RimColor, 색, 흰색, 가장자리 강조색]
+              - [_RimThreshold, 0 ~ 1, '0.7', 림이 시작되는 기준]
+              - [_RimSmoothness, 0.001 ~ 0.3, '0.1', 림 경계 폭]
+
+  - title: 화면공간 외곽선 — Depth + Normal Roberts Cross
+    parts:
+      - badge: 외곽선
+        title: 머티리얼이 아니라 화면에 한 번
+        lede: >-
+          머티리얼마다 외곽선 Pass 를 붙이는 방식 대신 **화면 전체에 한 번** 도는 포스트프로세스로 만들었습니다. 오브젝트를 계속
+          추가할 예정이라, 새 오브젝트가 **설정 없이 자동으로** 외곽선 대상이 되게 하려는 것이었습니다. C# 렌더 패스 없이 풀스크린
+          렌더러 피처에 머티리얼만 연결합니다.
+        blocks:
+          - type: image
+            src: ../../assets/MouseAndCheese/렌더 피처.png
+            variant: aside
+            width: 330
+            label: RENDERER FEATURE
+            caption: >-
+              풀스크린 렌더러 피처 두 개 — 위가 외곽선(Requirements = **Depth, Normal**), 아래가 라디얼 블러(Requirements 없음 —
+              색 버퍼만 필요). 둘 다 후처리 뒤에 끼우고, 셰이더는 머티리얼로만 꽂았습니다.
+          - type: points
+            columns: 2
+            items:
+              - title: 머티리얼별 외곽선 Pass (미채택)
+                body: 머티리얼마다 Pass 추가 · 새 오브젝트마다 설정 필요 · 메시 노멀 상태에 의존
+              - title: 화면공간 외곽선 (채택)
+                body: 씬에 한 번 · 새 오브젝트 자동 대상 · 대신 거리에 따라 깊이 민감도가 달라짐
+          - type: code
+            api: ToonOutlineFullScreen.shader · Frag
+            code: |-
+              float2 texel = _BlitTexture_TexelSize.xy;
+
+              // Roberts Cross: 대각선 방향 2쌍의 샘플을 비교해 깊이/노멀이 급격히 변하는 지점(=윤곽선)을 찾는다
+              float depthTL = SampleSceneDepth(uv + texel * float2(-1, -1));
+              float depthBR = SampleSceneDepth(uv + texel * float2( 1,  1));
+              float depthTR = SampleSceneDepth(uv + texel * float2( 1, -1));
+              float depthBL = SampleSceneDepth(uv + texel * float2(-1,  1));
+              float depthEdge = abs(depthTL - depthBR) + abs(depthTR - depthBL);
+
+              float3 normalTL = SampleSceneNormals(uv + texel * float2(-1, -1));
+              float3 normalBR = SampleSceneNormals(uv + texel * float2( 1,  1));
+              float3 normalTR = SampleSceneNormals(uv + texel * float2( 1, -1));
+              float3 normalBL = SampleSceneNormals(uv + texel * float2(-1,  1));
+              float normalEdge = length(normalTL - normalBR) + length(normalTR - normalBL);
+
+              // 깊이만으로는 같은 평면 위의 그림 경계를 못 잡고,
+              // 노멀만으로는 평행한 면이 겹쳐진 경우를 못 잡기 때문에 두 기준을 함께 사용한다
+              half edge = saturate(step(_DepthThreshold, depthEdge) + step(_NormalThreshold, normalEdge));
+
+              return lerp(sceneColor, _OutlineColor, edge);
+            notes:
+              - at: 대각 4샘플
+                why: 대각선 두 쌍만 1텍셀 간격으로 비교해 샘플 수를 8번으로 묶었다.
+              - at: step + step 을 saturate
+                why: 깊이 기준과 노멀 기준 중 하나라도 넘으면 외곽선이다(OR). 실제 머티리얼 값은 깊이 0.015 · 노멀 0.7.
+              - at: SampleSceneDepth · SampleSceneNormals
+                why: 툰 셰이더의 깊이 · 노멀 Pass 가 채운 텍스처다. 그 Pass 가 없으면 이 오브젝트엔 외곽선이 안 그려진다.
+          - type: callout
+            badge: 주의
+            tone: white
+            body: >-
+              비선형 깊이를 그대로 빼기 때문에 거리에 따라 깊이 임계값의 민감도가 달라집니다. 그림자 디버깅 중 선형 깊이로 바꾸는
+              시도를 두 번 했지만 화면 곳곳이 !!검게 나오는 회귀!!가 생겨 되돌렸습니다.
+
+  - title: 속도 연출 — 화면 외곽 라디얼 블러
+    parts:
+      - badge: 라디얼 블러
+        title: 중심은 선명, 외곽만 방사형으로
+        lede: >-
+          화면 중심에서의 거리로 마스크를 만들어 **안쪽 반경(0.35)은 선명하게, 바깥 반경(0.75)부터 최대 블러**가 걸리게 했습니다.
+          샘플 지점을 중심 쪽으로 당기며 8번 샘플해 평균을 내고, 샘플 수는 컴파일 타임 상수로 둬 루프를 고정했습니다.
+          배고플수록 빨라지는 쥐가 일정 속도를 넘으면 C# 이 블러 강도와 FOV 를 함께 올립니다.
+        blocks:
+          - type: code
+            api: SpeedRadialBlur.shader · Frag
+            code: |-
+              float distanceFromCenter = length(uv - center);
+              // InnerRadius 안쪽은 완전히 선명, OuterRadius 바깥에서만 블러가 최대 강도
+              float radiusMask = smoothstep(_InnerRadius, _OuterRadius, distanceFromCenter);
+
+              // 강도와 마스크만큼 샘플 지점을 중심 쪽으로 당겨 방사형 블러
+              float2 direction = (uv - center) * _BlurIntensity * radiusMask;
+
+              for (int i = 0; i < SAMPLE_COUNT; i++)   // #define SAMPLE_COUNT 8
+              {
+                  float t = (float)i / (SAMPLE_COUNT - 1);
+                  accumulatedColor += SAMPLE_TEXTURE2D_X_LOD(_BlitTexture, sampler_LinearClamp, uv - direction * t, 0);
+              }
+              return accumulatedColor / SAMPLE_COUNT;
+            notes:
+              - at: radiusMask 를 direction 에 곱함
+                why: 분기 없이 이 곱셈 하나로 "중심 선명 · 외곽 블러"가 된다. 마스크가 0 인 중심은 원래 좌표와 같아진다.
+              - at: SAMPLE_COUNT 상수
+                why: 런타임 프로퍼티로 열지 않아 셰이더가 단순하고, 고정 루프라 컴파일러가 풀 수 있다.
+          - type: code
+            api: SpeedEffectController.cs · LateUpdate
+            code: |-
+              private void LateUpdate()
+              {
+                  bool isBoosted = IsSpeedBoosted();
+
+                  float targetFov = isBoosted ? _speedEffectData.BoostedFov : _speedEffectData.BaseFov;
+                  _camera.fieldOfView = Mathf.SmoothDamp(_camera.fieldOfView, targetFov, ref _fovVelocity, _speedEffectData.FovSmoothTime);
+
+                  float targetBlur = isBoosted ? _speedEffectData.MaxBlurIntensity : 0f;
+                  _currentBlurIntensity = Mathf.SmoothDamp(_currentBlurIntensity, targetBlur, ref _blurVelocity, _speedEffectData.BlurSmoothTime);
+                  _radialBlurMaterial.SetFloat(BlurIntensityId, _currentBlurIntensity);
+              }
+
+              private bool IsSpeedBoosted()
+              {
+                  float thresholdSpeed = _playerStatData.EvaluateMoveSpeed(_speedEffectData.HungerRatioThreshold);
+                  return _hungerController.CurrentMoveSpeed >= thresholdSpeed;
+              }
+            notes:
+              - at: EvaluateMoveSpeed(HungerRatioThreshold)
+                why: 기획상 기준은 "배고픔 비율 0.75" 지만, 같은 곡선으로 속도 단위로 바꿔 현재 속도와 비교한다.
+              - at: SmoothDamp
+                why: 블러(최대 0.3)와 FOV(60 → 75)가 0.5초 관성으로 따라와 툭 끊기지 않는다.
+              - at: LateUpdate
+                why: 카메라 추종과 같은 타이밍에 그 프레임의 최종 상태를 반영한다.
+          - type: callout
+            badge: 데이터
+            tone: white
+            body: >-
+              블러 · FOV 수치 에셋은 구글 시트 데이터 테이블 임포트에서 **의도적으로 뺐습니다.** 화면을 보면서 맞춰야 하는 값이라
+              인스펙터에서 직접 조정합니다.
+
+  - title: 렌더링 디버깅 · 최적화 — 그림자와 GC
+    intro: >-
+      툰 셰이더를 붙이고 나서 드러난 문제 셋을 **프로파일러와 A/B 비교로 좁혀** 잡았습니다. 셋 다 증상만 보고 고치면 엉뚱한
+      곳을 건드리게 되는 종류였습니다.
+    parts:
+      - badge: 그림자 ①
+        title: 계단 모양 그림자 — Cascade 경계
+        lede: >-
+          카메라 거리에 따라 벽 그림자가 !!계단처럼 찢어졌습니다.!! URP 는 카메라 거리별로 그림자를 여러 단계(Cascade)로 나눠
+          해상도를 달리 그리는데, 기본 분할에서 첫 경계가 약 18유닛이고 주방은 카메라에서 20~50유닛에 걸쳐 있어 **그림자가
+          경계에 걸쳐** 있었습니다. 분할을 ==(0.4, 0.6, 0.8)== 로 바꿔 첫 단계가 0~60유닛을 덮게 해 주방 전체를 한 단계에 넣었습니다.
+        blocks:
+          - type: figure-grid
+            cells:
+              - src: ../../assets/MouseAndCheese/그림자 찢어짐 버그.png
+                caption: '**수정 전** — 벽 그림자가 Cascade 경계에서 !!계단처럼 겹쳐!! 그려진다'
+                background: '#fff'
+                width: 421
+                height: 197
+              - src: ../../assets/MouseAndCheese/그림자 찢어짐 해결.png
+                caption: '**수정 후 설정** — Max Distance 150 · Split ==60 / 90 / 120== (첫 Cascade 60m)'
+                background: '#232323'
+                width: 288
+                height: 197
+      - badge: 그림자 ②
+        title: 그림자 캐스터 142 — 정적 그림자 굽기
+        lede: >-
+          드로우콜(316)은 높았지만 비용이 큰 SetPass Call 이 39 로 낮아 우선순위에서 뺐습니다. 대신 **Shadow Casters 142** 가
+          눈에 띄었는데, 대부분 움직이지 않는 주방 오브젝트였습니다. 정적 오브젝트 그림자를 ==Mixed Light · Shadowmask 로 굽기로==
+          했습니다.
+        blocks:
+          - type: image
+            src: ../../assets/MouseAndCheese/렌더링디버깅.png
+            label: PROFILER
+            caption: >-
+              최적화 전 — SetPass Calls **39** · Draw Calls 316 · **Shadow Casters 142**. 움직이지 않는 주방 오브젝트까지 매 프레임
+              실시간 그림자맵에 그려지고 있었습니다.
+          - type: image
+            src: ../../assets/MouseAndCheese/그림자굽기사라짐버그.png
+            variant: aside
+            width: 330
+            label: BUG
+            caption: >-
+              베이크 직후 — 식탁 · 의자의 !!그림자가 전부 사라졌다.!! 툰 셰이더가 구워진 그림자(Shadowmask)를 읽지 않고 있었습니다.
+          - type: prose
+            paragraphs:
+              - >-
+                원인은 셰이더였습니다. 직접 쓴 툰 셰이더는 실시간 그림자맵만 읽고 있어서, 그림자를 굽자 정적 오브젝트의 그림자가 통째로
+                빠졌습니다. 라이트맵 · Shadowmask 키워드를 추가하고, 정점 입력에 **두 번째 UV(라이트맵 좌표)** 를 받아
+                ==구운 그림자를 샘플해 메인 라이트에 함께 넘기도록== 고쳤습니다(ForwardLit 코드의 첫 두 줄). 그 뒤 사과 · 치즈 ·
+                쥐덫처럼 작은 소품은 그림자 캐스팅을 껐습니다.
+          - type: image
+            src: ../../assets/MouseAndCheese/캐스트셰도우 최적화 성공.png
+            variant: aside
+            width: 330
+            label: PROFILER
+            caption: >-
+              최적화 후 — **Shadow Casters 15** · Draw Calls 173 · Static Batching 56 이 잡혔습니다.
+          - type: metrics
+            items:
+              - label: Shadow Casters
+                before: '142'
+                after: '15'
+                delta: 89% 감소
+              - label: Draw Calls
+                before: '316'
+                after: '173'
+                delta: 45% 감소
+      - badge: GC
+        title: 프레임마다 64.8KB — TMP 내부 배열 재할당
+        lede: >-
+          프로파일러의 뾰족한 구간은 먼저 의심했지만, 작업이 없어 **화면 갱신을 기다리는 대기 시간**이라 최적화 대상이 아니었습니다.
+          진짜 문제는 **GC 64.8KB(255회)** 였고, 추적하니 TMP 텍스트였습니다. 활성화 때 한 번 도는 초기화 할당은 일회성이라 두고,
+          **런타임에 여러 번 불릴 수 있는 배열 크기 재할당**을 막았습니다 — 시작할 때 ==충분히 긴 문자열로 미리 채워== 배열을 넓혀 둡니다.
+        blocks:
+          - type: image
+            src: ../../assets/MouseAndCheese/가비지원인 1.png
+            label: PROFILER
+            caption: >-
+              TMP 텍스트 파싱 아래 배열 크기 재할당(`TMP.SetArraySizes`)이 **30KB** 를 할당 — 점수 자릿수가 늘 때마다 다시 불릴 수 있다.
+          - type: code
+            api: ScoreHUD.cs · Awake
+            code: |-
+              /// <summary>
+              /// TMP 텍스트 컴포넌트를 가져오고, 충분히 긴 문자열로 내부 배열을 미리 할당한다.
+              /// TMP는 한 번 늘어난 내부 배열을 줄이지 않으므로, 이후 자릿수가 늘어날 때마다 배열을 다시
+              /// 할당하며 GC가 발생하는 것을 막을 수 있다
+              /// </summary>
+              private void Awake()
+              {
+                  _text = GetComponent<TMP_Text>();
+                  _text.text = "Score : 9999999";
+              }
+            notes:
+              - at: '"Score : 9999999"'
+                why: 도달할 수 있는 최대 길이로 한 번 채워 두면 TMP 가 배열을 줄이지 않으므로 이후 재할당이 없다. 거리 · 결과 · 카운트다운 UI 에도 같은 처리를 했다.
+
+  - title: Blender 에셋 제작
+    parts:
+      - lede: >-
+          캐릭터(쥐 · 고양이)와 주방 소품을 블렌더에서 **모델링 → UV 전개 · 텍스처 → 리깅 → 애니메이션**까지 직접 만들어 FBX 로
+          유니티에 가져왔습니다. 다리에는 ==IK 본 제약==을 걸어 발끝 목표점과 무릎 방향(Pole)만 움직여 다리 전체를 제어했습니다.
+        blocks:
+          - type: image
+            src: ../../assets/MouseAndCheese/블렌더 관련이미지/uv매핑 텍스처링.png
+            label: UV · TEXTURE
+            caption: >-
+              고양이 캐릭터 — 왼쪽이 UV 전개와 직접 칠한 텍스처, 오른쪽이 그 텍스처를 입힌 모델입니다.
+          - type: image
+            src: ../../assets/MouseAndCheese/블렌더 관련이미지/리깅 및 IK 적용.png
+            label: RIGGING · IK
+            caption: >-
+              다리 리깅 — 정강이 본에 **IK 제약**(목표 본 · Pole 본 · 체인 길이 2)을 걸어 발 위치만으로 허벅지 · 정강이가 따라오게 했습니다.
+          - type: image
+            src: ../../assets/MouseAndCheese/블렌더 관련이미지/애니메이션.png
+            label: ANIMATION
+            caption: >-
+              쥐 캐릭터 애니메이션 — 포즈 모드에서 컨트롤 본을 움직여 25프레임 구간을 키프레임으로 잡았습니다.
+
+# ── ④ 고민과 선택 ─────────────────────────────────────────────────────────
+decisions:
+  - title: 렌더링 최적화 대상 — 드로우콜 vs 그림자 캐스터
+    options:
+      - { key: A, title: 드로우콜(316) 줄이기 }
+      - { key: B, title: 그림자 캐스터(142) 줄이기, chosen: true }
+    criteria:
+      - label: 측정값
+        values:
+          - Draw Calls 316 · SetPass Calls 39
+          - Shadow Casters 142
+      - label: 성능 영향 판단
+        values:
+          - SetPass 가 낮아(SRP Batcher 가 같은 셰이더를 묶음) 지장 없다고 봄
+          - 움직이지 않는 정적 오브젝트까지 매 프레임 실시간 그림자맵에 그려짐
+      - label: 해결 수단
+        values:
+          - 메시 · 머티리얼 합치기, 배칭
+          - Mixed Light · Shadowmask 로 정적 오브젝트 그림자 베이크
+    reason: >-
+      드로우콜 숫자는 높아 보였지만 비용이 큰 SetPass Call 이 39 로 낮아 성능에 지장이 없다고 판단했습니다. 반면 그림자 캐스터
+      142 개는 대부분 움직이지 않는 주방 오브젝트였습니다. ==정적 오브젝트 그림자를 굽기==로 했고, 베이크 후 !!그림자가 전부
+      사라지는!! 문제를 셰이더 수정으로 풀었습니다. 결과 Shadow Casters ==142 → 15==.
+
+  - title: 임포트 회전 보정 — Bake Space Transform 일괄 OFF vs 단일 모델만 ON
+    options:
+      - { key: A, title: 모든 모델 OFF }
+      - { key: B, title: 계층 없는 단일 모델만 ON, chosen: true }
+    criteria:
+      - label: 계층 모델(냉장고)
+        values:
+          - 빈 루트가 회전을 흡수해 정상
+          - OFF 유지 → 정상
+      - label: 단일 모델
+        values:
+          - 자신이 루트라 회전 보정 문제
+          - 회전을 0 으로 보정
+      - label: 자식 Transform 변경 문제
+        values:
+          - 없음
+          - 자식이 없는 모델에만 켜므로 해당 없음
+      - label: 설정 관리
+        values:
+          - 규칙 하나
+          - 모델 구조에 따라 설정을 구분해야 함
+    reason: >-
+      계층 구조가 있는 모델은 회전값 0 인 빈 루트가 자동으로 생겨 회전을 흡수하지만, 계층이 없는 단일 모델은 오브젝트 자신이
+      루트가 되어 !!회전 보정이 깨졌습니다.!! 이전에 냉장고에서 이 옵션을 켰다가 자식 Transform 이 바뀌어 꺼 두었는데, 단일
+      모델은 자식이 없어 그 문제를 겪을 일이 없고 오히려 회전을 0 으로 맞추는 데 필요했습니다. 그래서 ==자식 없는 단일 모델에만
+      켰습니다.==
+
+  - title: 음식 · 장애물 판별 — 태그 vs 인터페이스
+    options:
+      - { key: A, title: 태그 기반 분기 }
+      - { key: B, title: IHungerObj 인터페이스, chosen: true }
+    criteria:
+      - label: 새 종류 추가
+        values:
+          - 종류마다 태그를 새로 추가해야 함
+          - 태그 추가 없이 인터페이스 구현 컴포넌트만 부착
+      - label: 코드 중복
+        values:
+          - 태그별 분기에 비슷한 처리가 반복됨
+          - 하나의 경로로 통합 — 중복 제거
+      - label: 값 전달
+        values:
+          - 종류별로 분기해 값을 정함
+          - 오브젝트가 든 변경량을 인자로 넘김
+    reason: >-
+      태그 방식은 종류가 늘 때마다 태그를 추가해야 했고, 분기마다 비슷한 코드가 반복됐습니다. ==인터페이스로 바꾸고 값을 인자로
+      넘기니== 태그를 추가할 필요가 없어졌고 중복 코드도 사라졌습니다. 지금은 시간 감소 · 음식 · 쥐덫이 모두 배고픔을 바꾸는
+      한 경로를 타고, 배고픔이 바뀌면 이벤트로 UI · 연출 쪽에 알립니다.
+
+# ── ⑤ 결과 · 회고 (② 사람이 쓴 판단) ──────────────────────────────────────
+retrospective:
+  results:
+    - Shadow Casters **142 → 15** (정적 그림자 베이크 + 소품 그림자 캐스팅 끄기)
+    - Draw Calls 316 → 173
+  satisfaction:
+    - title: 툰 셰이더
+      body: 툰 셰이더와 속도 라디얼 블러가 만족스럽게 나왔습니다.
+    - title: 게임 개발 파이프라인 경험
+      body: 기획부터 모델링, 프로그래밍까지 게임 개발 파이프라인 전체를 경험했습니다.
+  learnings:
+    - title: 블렌더 임포트
+      cells:
+        - label: 스케일 100
+          body: >-
+            블렌더에서 가져온 모델의 스케일이 !!100 으로 읽혔습니다.!! Apply Scalings 를 **All Local**, 유니티 쪽을 **FBX Units
+            Scale** 로 맞춰 해결했습니다 — 파일에 적힌 값을 그대로 읽을지, 유니티가 변환해 1 로 읽을지의 차이였습니다.
+        - label: 회전
+          body: >-
+            계층 없는 단일 모델만 회전 보정이 깨졌습니다. 빈 루트가 회전을 흡수하는지가 갈랐고, 단일 모델에만 Bake Space
+            Transform 을 켰습니다(고민과 선택 2).
+        - label: 알게 된 점
+          body: >-
+            Export · Import 설정은 한 번 틀리면 모델마다 반복됩니다. ==설정을 프리셋으로 만들어== 같은 실수를 되풀이하지 않게 했습니다.
+    - title: 툰 셰이더
+      tint: true
+      body: >-
+        셰이더에서 Pass 를 선언하고 Pass 별로 HLSL 을 작성하는 방식, 메인 라이팅 · 그림자 · 포스트프로세스, 그리는 순서를 정할 때
+        쓰는 깊이 버퍼까지 — 셰이더 구조를 더 깊이 알게 됐습니다. 특히 그림자를 구운 뒤 !!그림자가 사라진!! 일로, 직접 쓴 셰이더는
+        URP 가 해주던 것(Shadowmask)을 **내가 다 챙겨야 한다**는 걸 배웠습니다.
+  improvements:
+    - title: 커스텀 Render Feature
+      body: >-
+        이번엔 화면 전역에 적용하는 효과라 인스펙터에서 풀스크린 렌더러 피처에 머티리얼만 꽂으면 됐지만, 다음에는 Custom Render
+        Feature 를 코드로 직접 구현해 렌더 패스 이해도를 높이겠습니다.

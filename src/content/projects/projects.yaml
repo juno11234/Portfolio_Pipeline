@@ -1,8 +1,15 @@
 # 키가 그대로 주소가 된다. bond -> /projects/bond
 # 여기 있는 건 사이드바 내비게이션에 필요한 정보뿐이다. 상세 내용은 나중에 별도 파일로 붙인다.
 
-bond:
+mouse-and-cheese:
   order: 1
+  title: MouseAndCheese
+  genre: 3D 러너
+  summary: HLSL 툰 셰이더 · 화면공간 외곽선 · 그림자 캐스터 142 → 15
+  featured: true
+
+bond:
+  order: 2
   # 포트폴리오 PDF에는 '4인 팀프로젝트'로 되어 있으나, 자기소개서에 "Bond의 핵심 재미 루프는…"
   # 이라고 쓰여 있어 실제 이름을 썼다. 나머지 5개는 전부 이름이 있어 목록에서 균형이 맞는다.
   title: Bond
@@ -11,7 +18,7 @@ bond:
   featured: true
 
 vampire-like:
-  order: 2
+  order: 3
   title: 뱀서라이크
   genre: 탑뷰 핵 앤 슬래시
   # 이 문서의 부제는 장르 그 자체라 카드 설명을 자동으로 못 만든다. 수치는 vampire-like.yaml 의 evidence 에서.
@@ -19,7 +26,7 @@ vampire-like:
   featured: true
 
 soulslike:
-  order: 3
+  order: 4
   title: 소울라이크
   genre: 3인칭 액션
   # 자동 문구('3인칭 소울라이크 액션')가 장르 반복이라 실제로 만든 것을 적는다.
@@ -27,20 +34,20 @@ soulslike:
   featured: true
 
 starwars-jedi:
-  order: 4
+  order: 5
   title: Starwars Jedi 모티브
   genre: 3인칭 액션
   featured: true
 
 hammer:
-  order: 5
+  order: 6
   title: 기업협약 프로젝트
   genre: 탑뷰 방치형 로그라이크
   team: 9인
   featured: false
 
 vermintide:
-  order: 6
+  order: 7
   title: Vermintide 모티브
   genre: 1인칭 슈팅
   featured: false
