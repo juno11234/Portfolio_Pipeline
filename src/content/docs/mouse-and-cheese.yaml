@@ -80,6 +80,8 @@ meta:
 links:
   - label: GitHub 저장소
     url: https://github.com/juno11234/MouseAndCheeseGame
+  - label: 기획 문서 (Notion)
+    url: https://app.notion.com/p/3c58e7b5ce4a8096ae58e4fe7e3e2da6
 
 # ── ② 시스템 구조 ─────────────────────────────────────────────────────────
 architecture:
