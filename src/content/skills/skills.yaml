@@ -9,7 +9,7 @@
     - ShaderLab
   highlights:
     - C# 유니티 6개의 개인, 3개의 팀 프로젝트
-    - 커스텀 Shader 작성, 실루엣·속도선 구현
+    - 툰 Shader 작성, 실루엣·속도선 구현
 
 debugging:
   order: 2
