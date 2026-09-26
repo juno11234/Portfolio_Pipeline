@@ -77,6 +77,8 @@ meta:
   ide: Rider
 
 links:
+  - label: 플레이 영상 (YouTube)
+    url: https://youtu.be/m00c717Dydg
   - label: GitHub 저장소
     url: https://github.com/juno11234/MouseAndCheeseGame
   - label: 기획 문서 (Notion)
